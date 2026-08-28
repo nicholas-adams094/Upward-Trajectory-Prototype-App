@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/*
+  Upward Trajectory portal — design tokens.
+  The chart series slots come from a validated categorical palette; the app
+  commits to a single light theme so the data colours are never auto-inverted.
+*/
+@theme {
+  --color-plane: #f7f7f5;
+  --color-surface: #ffffff;
+  --color-surface-2: #fbfbfa;
+  --color-hairline: #e6e5e0;
+  --color-ink: #0b0b0b;
+  --color-ink-2: #52514e;
+  --color-muted: #898781;
+
+  --color-brand: #1d1b45;
+  --color-brand-2: #2e2a6b;
+  --color-accent: #4f46e5;
+  --color-accent-soft: #eef0fe;
+
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+
+  --color-good: #0ca30c;
+  --color-warning: #fab219;
+  --color-serious: #ec835a;
+  --color-critical: #d03b3b;
+
+  --color-grid: #e1e0d9;
+  --color-axis: #c3c2b7;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-plane);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus ring that reads on both the light plane and the dark sidebar. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
