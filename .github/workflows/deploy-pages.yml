@@ -1,5 +1,9 @@
 name: Deploy to GitHub Pages
 
+# One-time setup by a repository admin, which no workflow token can do for you:
+#   Settings → Pages → Build and deployment → Source: "GitHub Actions"
+# Without it, the deploy job fails with "Resource not accessible by integration".
+
 on:
   push:
     branches:
@@ -9,7 +13,6 @@ on:
       - claude/coaching-progress-portal-nmukub
   workflow_dispatch:
 
-# Allow the workflow to publish to Pages, and to read the repo.
 permissions:
   contents: read
   pages: write
@@ -23,10 +26,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Project pages are served from /<repo>/, so the build needs that prefix.
+      BASE_PATH: /${{ github.event.repository.name }}/
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -36,19 +42,17 @@ jobs:
       - name: Check the seeded demo data is internally consistent
         run: npm run check:data
 
-      - name: Configure Pages
-        id: pages
-        uses: actions/configure-pages@v5
-        with:
-          # Turns Pages on for the repository if it is not already enabled.
-          enablement: true
-
       - name: Build
         run: npm run build
-        env:
-          BASE_PATH: ${{ steps.pages.outputs.base_path }}/
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Verify the build carries the Pages sub-path
+        # A wrong base path deploys a blank page rather than failing, so assert it.
+        run: |
+          grep -q "src=\"${BASE_PATH}assets/" dist/index.html \
+            || { echo "::error::dist/index.html does not reference ${BASE_PATH}assets/"; exit 1; }
+          test -f dist/404.html || { echo "::error::missing dist/404.html SPA fallback"; exit 1; }
+
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -60,4 +64,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

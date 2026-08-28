@@ -112,6 +112,27 @@ Every screen is interactive and every change persists (to `localStorage`).
   every figure, keep status colour paired with an icon and a label, and suppress nothing silently.
   The app commits to a single light theme so data colours are never auto-inverted.
 
+## Deploying
+
+The app is a static build, published to GitHub Pages by
+[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) on every push to `main`.
+
+**One-time setup by a repository admin:** *Settings → Pages → Build and deployment → Source:*
+**GitHub Actions**. No workflow token can turn Pages on for you, so until that switch is flipped the
+deploy job fails with `Resource not accessible by integration`. Once it is set, re-run the workflow
+and the site goes live at
+`https://<owner>.github.io/<repo>/`.
+
+Two details Pages needs, both handled in [`vite.config.ts`](vite.config.ts):
+
+- **Sub-path.** Project pages are served from `/<repo>/`, so production builds set `base` (overridable
+  with `BASE_PATH`) and the router reads it back from `import.meta.env.BASE_URL`.
+- **Deep links.** Pages has no SPA rewrite, so `/engagements/e-marcus` would 404 on a hard refresh.
+  The build writes `dist/404.html` as a copy of `index.html`, which hands the request back to the
+  client router with the URL intact.
+
+CI asserts both before deploying — a wrong base path would publish a blank page rather than fail.
+
 ## Stack
 
 React 19 · TypeScript · Vite · Tailwind CSS v4 · React Router. Data lives in a typed in-memory store
