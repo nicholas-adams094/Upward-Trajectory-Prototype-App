@@ -6,8 +6,17 @@ import type {
 
 /* ------------------------------------------------------------------ dates */
 
-/** The demo is pinned to a fixed "today" so screenshots and numbers are stable. */
-export const TODAY = new Date('2026-08-28T00:00:00Z')
+/**
+ * Every seeded date is relative to the day the demo is opened, so a link shared
+ * today still reads correctly in a month: sessions stay upcoming, commitments
+ * stay due, and nothing silently rots into "overdue by six weeks".
+ *
+ * Ratings and text remain deterministic — only the calendar moves.
+ */
+export const TODAY = (() => {
+  const now = new Date()
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+})()
 
 const DAY = 86_400_000
 const iso = (d: Date) => d.toISOString().slice(0, 10)

@@ -147,8 +147,10 @@ CI asserts both before deploying — a wrong base path would publish a blank pag
 ## Stack
 
 React 19 · TypeScript · Vite · Tailwind CSS v4 · React Router. Data lives in a typed in-memory store
-persisted to `localStorage` ([`src/data/store.ts`](src/data/store.ts)), seeded deterministically by
-[`src/data/seed.ts`](src/data/seed.ts) — a fixed PRNG means the demo looks the same every time.
+persisted to `localStorage` ([`src/data/store.ts`](src/data/store.ts)), seeded by
+[`src/data/seed.ts`](src/data/seed.ts). A fixed PRNG keeps ratings and text identical on every load,
+while dates are generated relative to the day the demo is opened — so a link shared today still
+reads correctly months later, rather than rotting into a wall of overdue commitments.
 
 ```
 src/
