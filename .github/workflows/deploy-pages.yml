@@ -8,9 +8,6 @@ on:
   push:
     branches:
       - main
-      # Lets the prototype go live before the initial PR is merged.
-      # Safe to drop this line once main is the source of truth.
-      - claude/coaching-progress-portal-nmukub
   workflow_dispatch:
 
 permissions:
