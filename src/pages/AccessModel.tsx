@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, PageHeader } from '../components/ui/primitives'
+import { Card, CardBody, CardHeader, PageHeader, ScrollableTable } from '../components/ui/primitives'
 import { RESOURCE_LABELS, VISIBILITY_MATRIX } from '../lib/permissions'
 import { ROLE_LABELS } from '../lib/metrics'
 import type { Role } from '../types'
@@ -34,7 +34,8 @@ export function AccessModel() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
           <CardHeader title="Visibility matrix" subtitle={`You are signed in as a ${ROLE_LABELS[viewer.role].toLowerCase()}. Your column is highlighted.`} />
-          <CardBody className="overflow-x-auto">
+          <CardBody>
+            <ScrollableTable hint="Scroll the table sideways to see every role.">
             <table className="w-full min-w-[620px] text-left">
               <thead>
                 <tr className="border-b border-hairline">
@@ -62,6 +63,7 @@ export function AccessModel() {
                 ))}
               </tbody>
             </table>
+            </ScrollableTable>
           </CardBody>
         </Card>
 

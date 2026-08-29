@@ -6,7 +6,7 @@ import { visibleEngagements } from '../lib/permissions'
 import { commitmentStats, engagementScore, formatDate, goalsFor, userById } from '../lib/metrics'
 import type { Database } from '../types'
 import { PHASES } from '../types'
-import { Avatar, Badge, Card, CardBody, PageHeader, inputClass } from '../components/ui/primitives'
+import { Avatar, Badge, Card, CardBody, PageHeader, ScrollableTable, inputClass } from '../components/ui/primitives'
 
 const hasReinforcement = (db: Database, engagementId: string) =>
   commitmentStats(db.actions.filter((a) => a.engagementId === engagementId), 'manager').due > 0
@@ -37,7 +37,8 @@ export function CoachClients() {
       </div>
 
       <Card>
-        <CardBody className="overflow-x-auto">
+        <CardBody>
+          <ScrollableTable>
           <table className="w-full min-w-[720px] text-left">
             <thead>
               <tr className="border-b border-hairline text-[11.5px] uppercase tracking-wide text-muted">
@@ -77,6 +78,7 @@ export function CoachClients() {
               )}
             </tbody>
           </table>
+          </ScrollableTable>
         </CardBody>
       </Card>
     </>

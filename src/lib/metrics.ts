@@ -1,5 +1,5 @@
 import type {
-  Action, CheckIn, Competency, Database, Engagement, Goal, Ratings, Relationship, Role,
+  Action, CheckIn, Competency, Database, Engagement, Goal, Relationship, Role,
 } from '../types'
 import { PHASES } from '../types'
 
@@ -160,16 +160,6 @@ export function suppressedGroups(db: Database, engagementId: string, minGroup = 
   })
 }
 
-export function averageRatings(ratings: Ratings[]): Ratings {
-  const out: Ratings = {}
-  const keys = new Set(ratings.flatMap((r) => Object.keys(r)))
-  for (const k of keys) {
-    const vals = ratings.map((r) => r[k]).filter((n): n is number => typeof n === 'number')
-    if (vals.length) out[k] = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
-  }
-  return out
-}
-
 /* ------------------------------------------------------ org analytics */
 
 export interface OrgAnalytics {
@@ -291,7 +281,7 @@ export function formatShort(iso: string) {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
-export function daysBetween(a: string, b: string) {
+function daysBetween(a: string, b: string) {
   return Math.round((new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / 86_400_000)
 }
 

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { initials } from '../../lib/metrics'
 
@@ -193,6 +194,16 @@ export function Restricted({ what, why }: { what: string; why: string }) {
   )
 }
 
+/** Wide tables scroll rather than squash; small screens get told so. */
+export function ScrollableTable({ children, hint = 'Scroll the table sideways to see every column.' }: { children: ReactNode; hint?: string }) {
+  return (
+    <div>
+      <div className="overflow-x-auto">{children}</div>
+      <p className="mt-2 text-[11.5px] text-muted sm:hidden">{hint}</p>
+    </div>
+  )
+}
+
 export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { id: T; label: string; count?: number }[]; active: T; onChange: (id: T) => void }) {
   return (
     <div className="flex flex-wrap gap-1 border-b border-hairline" role="tablist">
@@ -215,10 +226,58 @@ export function Tabs<T extends string>({ tabs, active, onChange }: { tabs: { id:
 }
 
 export function Modal({ open, title, onClose, children, footer }: { open: boolean; title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+  const panel = useRef<HTMLDivElement>(null)
+  const restoreTo = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    restoreTo.current = document.activeElement as HTMLElement | null
+    panel.current?.focus()
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+        return
+      }
+      // Keep Tab inside the dialog while it is open.
+      if (e.key !== 'Tab' || !panel.current) return
+      const focusable = panel.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKey)
+    // Stop the page behind the dialog scrolling with it.
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previousOverflow
+      restoreTo.current?.focus?.()
+    }
+  }, [open, onClose])
+
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/35 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="w-full max-w-2xl rounded-xl border border-hairline bg-surface shadow-xl">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/35 p-4 sm:p-8"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div ref={panel} tabIndex={-1} className="w-full max-w-2xl rounded-xl border border-hairline bg-surface shadow-xl outline-none">
         <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
           <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
           <button onClick={onClose} className="rounded-lg px-2 py-1 text-ink-2 hover:bg-plane" aria-label="Close">✕</button>

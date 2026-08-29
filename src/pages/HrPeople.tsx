@@ -4,7 +4,7 @@ import { useDb } from '../data/store'
 import { reportFor, visibleEngagements } from '../lib/permissions'
 import { commitmentStats, engagementScore, formatDate, goalsFor, userById } from '../lib/metrics'
 import { PHASES } from '../types'
-import { Avatar, Badge, Card, CardBody, PageHeader, StatusPill } from '../components/ui/primitives'
+import { Avatar, Badge, Card, CardBody, PageHeader, ScrollableTable, StatusPill } from '../components/ui/primitives'
 
 export function HrPeople() {
   const db = useDb()
@@ -19,7 +19,8 @@ export function HrPeople() {
         subtitle="Engagement status, plan progress and manager reinforcement for everyone you sponsor. Content stays with the coach."
       />
       <Card>
-        <CardBody className="overflow-x-auto">
+        <CardBody>
+          <ScrollableTable>
           <table className="w-full min-w-[820px] text-left">
             <thead>
               <tr className="border-b border-hairline text-[11.5px] uppercase tracking-wide text-muted">
@@ -69,6 +70,7 @@ export function HrPeople() {
               })}
             </tbody>
           </table>
+          </ScrollableTable>
         </CardBody>
       </Card>
     </>

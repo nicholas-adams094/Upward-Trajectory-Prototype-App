@@ -5,10 +5,27 @@ import { seedDatabase } from './seed'
 const KEY = 'upward-trajectory.db.v1'
 const SESSION_KEY = 'upward-trajectory.session.v1'
 
+/** Every table the app reads. A stored copy missing one is from an older build. */
+const TABLES: (keyof Database)[] = [
+  'orgs', 'users', 'competencies', 'engagements', 'assessments', 'respondents', 'responses',
+  'clifton', 'enneagram', 'reports', 'goals', 'actions', 'checkIns', 'sessions', 'activity',
+]
+
+function isUsable(value: unknown): value is Database {
+  if (!value || typeof value !== 'object') return false
+  const db = value as Record<string, unknown>
+  return TABLES.every((t) => Array.isArray(db[t])) && (db.users as unknown[]).length > 0
+}
+
 function load(): Database {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as Database
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw)
+      // A visitor who used an earlier build has a store from an older shape.
+      // Re-seeding beats crashing on a missing table.
+      if (isUsable(parsed)) return parsed
+    }
   } catch {
     /* fall through to a fresh seed */
   }

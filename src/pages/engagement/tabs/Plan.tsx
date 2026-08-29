@@ -95,7 +95,7 @@ export function Plan({ engagement }: { engagement: Engagement }) {
               </div>
 
               <div>
-                <h4 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">How we will know it worked</h4>
+                <h3 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">How we will know it worked</h3>
                 <ul className="mt-1.5 space-y-1">
                   {goal.measures.map((m) => (
                     <li key={m} className="flex gap-2 text-[13px] leading-relaxed text-ink-2">

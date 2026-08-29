@@ -5,7 +5,7 @@ import { competencyRollup, formatDate, suppressedGroups } from '../../../lib/met
 import { DOMAIN_BLURB, DOMAIN_ORDER } from '../../../lib/frameworks'
 import { RELATIONSHIP_LABELS } from '../../../types'
 import type { Engagement, Relationship } from '../../../types'
-import { Badge, Card, CardBody, CardHeader, EmptyState, Restricted } from '../../../components/ui/primitives'
+import { Badge, Card, CardBody, CardHeader, EmptyState, Restricted, ScrollableTable } from '../../../components/ui/primitives'
 import { GapChart } from '../../../components/charts'
 
 const GROUPS: Relationship[] = ['manager', 'peer', 'direct_report', 'stakeholder']
@@ -62,7 +62,8 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
           title="By rater group"
           subtitle="Where the cost of a behaviour actually lands. The manager column is attributed by design; every other group needs at least two responses before it is shown."
         />
-        <CardBody className="overflow-x-auto">
+        <CardBody>
+          <ScrollableTable hint="Scroll the table sideways to see every rater group.">
           <table className="w-full min-w-[560px] text-left text-[13px]">
             <thead>
               <tr className="border-b border-hairline text-[11.5px] uppercase tracking-wide text-muted">
@@ -91,6 +92,7 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
               ))}
             </tbody>
           </table>
+          </ScrollableTable>
           {suppressed.length > 0 && (
             <p className="mt-3 text-[12.5px] leading-snug text-muted">
               <span aria-hidden="true">🔒 </span>

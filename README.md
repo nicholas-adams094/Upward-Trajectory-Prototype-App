@@ -14,13 +14,18 @@ career coaching and consulting practice:
 Everything in that paragraph is built. Four audiences share one portal, and what each of them can
 see is enforced in code rather than by convention.
 
+### ▸ [Open the live prototype](https://nicholas-adams094.github.io/Upward-Trajectory-Prototype-App/)
+
+No backend, no accounts, no setup — pick a person on the sign-in screen and you are in the portal
+exactly as they would see it. Everything is clickable, and the demo data lives only in your own
+browser, so you cannot break anyone else's copy. **Reset demo data** in the sidebar puts it back.
+
+To run it locally instead:
+
 ```bash
 npm install
 npm run dev      # http://localhost:5173
 ```
-
-No backend, no accounts, no setup. Pick a person on the sign-in screen and you are in the portal
-exactly as they would see it.
 
 ![Coach practice dashboard](docs/02-coach-dashboard.png)
 
@@ -111,17 +116,23 @@ Every screen is interactive and every change persists (to `localStorage`).
 - **Charts** follow a validated categorical palette (blue / orange / aqua), carry a table view for
   every figure, keep status colour paired with an icon and a label, and suppress nothing silently.
   The app commits to a single light theme so data colours are never auto-inverted.
+- **Charts draw at one SVG unit per CSS pixel**, measuring their container rather than scaling a
+  fixed viewBox — otherwise every label shrinks to about 6px on a phone. Below 560px the dumbbell
+  moves its labels above each track and the trend chart drops its end labels for the legend.
+- **It works on a phone.** Chris will open the link on one. Every screen was checked at 390px for
+  overflow and legibility, and wide tables scroll with an explicit hint rather than squashing.
+- **Nothing white-screens.** An error boundary catches render failures and offers a reset, and a
+  local store left over from an older build is detected and re-seeded rather than crashing on a
+  missing table.
 
 ## Deploying
 
 The app is a static build, published to GitHub Pages by
 [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) on every push to `main`.
 
-**One-time setup by a repository admin:** *Settings → Pages → Build and deployment → Source:*
-**GitHub Actions**. No workflow token can turn Pages on for you, so until that switch is flipped the
-deploy job fails with `Resource not accessible by integration`. Once it is set, re-run the workflow
-and the site goes live at
-`https://<owner>.github.io/<repo>/`.
+Pages must be enabled once by a repository admin — *Settings → Pages → Build and deployment →
+Source:* **GitHub Actions**. No workflow token can turn Pages on for you, so until that switch is
+flipped the deploy job fails with `Resource not accessible by integration`.
 
 Two details Pages needs, both handled in [`vite.config.ts`](vite.config.ts):
 

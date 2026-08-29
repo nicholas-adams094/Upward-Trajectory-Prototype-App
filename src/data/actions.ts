@@ -70,13 +70,6 @@ export function addGoal(input: Omit<Goal, 'id' | 'createdOn' | 'status'>, actor:
   })
 }
 
-export function updateGoal(goalId: string, patch: Partial<Goal>) {
-  mutate((db) => {
-    const g = db.goals.find((x) => x.id === goalId)
-    if (g) Object.assign(g, patch)
-  })
-}
-
 /* ---------------------------------------------------------------- report */
 
 export function saveReport(report: SynthesisReport) {

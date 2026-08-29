@@ -115,7 +115,7 @@ export function CoachDashboard() {
                           </>
                         ) : (
                           <p className="self-center text-[12px] text-muted sm:col-span-2">
-                            No coaching plan yet — {PHASES.find((p) => p.id === e.phase)!.blurb.toLowerCase()}
+                            No coaching plan yet · {PHASES.find((p) => p.id === e.phase)!.blurb}
                           </p>
                         )}
                       </div>

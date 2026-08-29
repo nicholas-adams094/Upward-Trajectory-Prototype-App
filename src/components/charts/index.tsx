@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 export const SERIES = ['var(--color-series-1)', 'var(--color-series-2)', 'var(--color-series-3)'] as const
@@ -18,7 +18,19 @@ interface TipState {
 
 function useTooltip() {
   const [tip, setTip] = useState<TipState | null>(null)
+  const [width, setWidth] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
+
+  // Charts draw at 1 SVG unit per CSS pixel, so labels stay the size they were
+  // designed at whatever the screen width. A fixed viewBox would shrink them.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    setWidth(el.getBoundingClientRect().width)
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const show = (evt: { clientX: number; clientY: number }, node: ReactNode) => {
     const box = ref.current?.getBoundingClientRect()
@@ -36,7 +48,7 @@ function useTooltip() {
     </div>
   ) : null
 
-  return { ref, show, hide, layer }
+  return { ref, show, hide, layer, width }
 }
 
 /* ---------------------------------------------------------- table toggle */
@@ -100,16 +112,23 @@ export interface GapRow {
 export function GapChart({
   rows, aLabel, bLabel, min = 1, max = 5, note,
 }: { rows: GapRow[]; aLabel: string; bLabel: string; min?: number; max?: number; note?: string }) {
-  const { ref, show, hide, layer } = useTooltip()
-  const W = 760
-  const LEFT = 210
-  const RIGHT = 46
-  const ROW = 34
-  const TOP = 24
+  const { ref, show, hide, layer, width } = useTooltip()
+  // Below this the left label gutter costs more than it is worth, so labels
+  // move onto their own line above each track.
+  const compact = width > 0 && width < 560
+  const W = Math.max(300, width || 760)
+  const LEFT = compact ? 4 : 210
+  const RIGHT = compact ? 4 : 46
+  const ROW = compact ? 54 : 34
+  const TOP = compact ? 20 : 24
   const H = TOP + rows.length * ROW + 10
-  const plotW = W - LEFT - RIGHT
+  const plotW = Math.max(40, W - LEFT - RIGHT)
   const x = (v: number) => LEFT + ((v - min) / (max - min)) * plotW
   const ticks = Array.from({ length: max - min + 1 }, (_, i) => min + i)
+  const trackY = (i: number) => TOP + i * ROW + (compact ? 38 : ROW / 2)
+
+  const gapText = (r: GapRow) =>
+    r.a !== null && r.b !== null ? `${r.b - r.a > 0 ? '+' : ''}${(r.b - r.a).toFixed(1)}` : ''
 
   return (
     <ChartFrame
@@ -117,17 +136,19 @@ export function GapChart({
       table={
         <DataTable
           head={['', aLabel, bLabel, 'Gap']}
-          rows={rows.map((r) => [
-            r.label,
-            r.a ?? '—',
-            r.b ?? '—',
-            r.a !== null && r.b !== null ? (r.b - r.a > 0 ? `+${(r.b - r.a).toFixed(1)}` : (r.b - r.a).toFixed(1)) : '—',
-          ])}
+          rows={rows.map((r) => [r.label, r.a ?? '—', r.b ?? '—', gapText(r) || '—'])}
         />
       }
     >
       <div className="relative" ref={ref}>
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${aLabel} compared with ${bLabel} across ${rows.length} competencies`}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          width={W}
+          height={H}
+          className="h-auto w-full"
+          role="img"
+          aria-label={`${aLabel} compared with ${bLabel} across ${rows.length} competencies`}
+        >
           {ticks.map((t) => (
             <g key={t}>
               <line x1={x(t)} x2={x(t)} y1={TOP - 8} y2={H - 8} stroke={GRID} strokeWidth={1} />
@@ -135,9 +156,11 @@ export function GapChart({
             </g>
           ))}
           {rows.map((r, i) => {
-            const y = TOP + i * ROW + ROW / 2
+            const y = trackY(i)
             const hasBoth = r.a !== null && r.b !== null
-            const coincident = hasBoth && Math.abs(r.b! - r.a!) < 0.06
+            // Two radii plus a gap: below this the marks overlap on screen.
+            const coincident = hasBoth && Math.abs(x(r.b!) - x(r.a!)) < 15
+            const gap = gapText(r)
             return (
               <g
                 key={r.label}
@@ -147,22 +170,48 @@ export function GapChart({
                       <p className="font-semibold">{r.label}</p>
                       <p className="mt-1 text-ink-2">{aLabel}: <span className="tabular font-medium text-ink">{r.a ?? '—'}</span></p>
                       <p className="text-ink-2">{bLabel}: <span className="tabular font-medium text-ink">{r.b ?? '—'}</span></p>
-                      {hasBoth ? <p className="mt-1 text-ink-2">Gap <span className="tabular font-medium text-ink">{(r.b! - r.a!) > 0 ? '+' : ''}{(r.b! - r.a!).toFixed(1)}</span></p> : null}
+                      {hasBoth ? <p className="mt-1 text-ink-2">Gap <span className="tabular font-medium text-ink">{gap}</span></p> : null}
                     </div>
                   ))
                 }
                 onMouseLeave={hide}
               >
-                <rect x={0} y={y - ROW / 2} width={W} height={ROW} fill="transparent" />
-                <text x={LEFT - 14} y={y + 3.5} textAnchor="end" fontSize={12} fill="var(--color-ink)">{r.label}</text>
+                <rect x={0} y={TOP + i * ROW} width={W} height={ROW} fill="transparent" />
+                {compact ? (
+                  <>
+                    <text x={0} y={TOP + i * ROW + 15} fontSize={12.5} fill="var(--color-ink)">{r.label}</text>
+                    {gap ? (
+                      <text
+                        x={W}
+                        y={TOP + i * ROW + 15}
+                        textAnchor="end"
+                        fontSize={12}
+                        className="tabular"
+                        fill={Math.abs(r.b! - r.a!) >= 1 ? 'var(--color-ink)' : MUTED}
+                      >
+                        {gap}
+                      </text>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <text x={LEFT - 14} y={y + 3.5} textAnchor="end" fontSize={12} fill="var(--color-ink)">{r.label}</text>
+                    {gap ? (
+                      <text
+                        x={W - RIGHT + 10}
+                        y={y + 3.5}
+                        fontSize={11.5}
+                        className="tabular"
+                        fill={Math.abs(r.b! - r.a!) >= 1 ? 'var(--color-ink)' : MUTED}
+                      >
+                        {gap}
+                      </text>
+                    ) : null}
+                  </>
+                )}
                 {hasBoth ? <line x1={x(r.a!)} x2={x(r.b!)} y1={y} y2={y} stroke={AXIS} strokeWidth={2} strokeLinecap="round" /> : null}
                 {r.a !== null ? <circle cx={x(r.a)} cy={y - (coincident ? 5 : 0)} r={6} fill={SERIES[0]} stroke={SURFACE} strokeWidth={2} /> : null}
                 {r.b !== null ? <circle cx={x(r.b)} cy={y + (coincident ? 5 : 0)} r={6} fill={SERIES[1]} stroke={SURFACE} strokeWidth={2} /> : null}
-                {hasBoth ? (
-                  <text x={W - RIGHT + 10} y={y + 3.5} fontSize={11.5} fill={Math.abs(r.b! - r.a!) >= 1 ? 'var(--color-ink)' : MUTED} className="tabular">
-                    {(r.b! - r.a!) > 0 ? '+' : ''}{(r.b! - r.a!).toFixed(1)}
-                  </text>
-                ) : null}
               </g>
             )
           })}
@@ -198,11 +247,19 @@ export interface TrendSeries {
 
 /** Weekly check-in ratings over time, with the goal target as a reference line. */
 export function TrendChart({ series, min = 1, max = 5, note }: { series: TrendSeries[]; min?: number; max?: number; note?: string }) {
-  const { ref, show, hide, layer } = useTooltip()
-  const W = 760
-  const H = 240
-  const LEFT = 34
-  const RIGHT = 178
+  const { ref, show, hide, layer, width } = useTooltip()
+  // On a narrow screen the end-label gutter eats most of the plot, so the
+  // labels come off and the legend carries series identity instead.
+  const compact = width > 0 && width < 560
+  const W = Math.max(300, width || 760)
+  const H = compact ? 200 : 240
+  const LEFT = 30
+  // Size the end-label gutter to the longest label rather than a fixed guess,
+  // so a direct label is never clipped by the edge of the drawing.
+  const MAX_LABEL = 32
+  const clip = (t: string) => (t.length > MAX_LABEL ? `${t.slice(0, MAX_LABEL - 1)}…` : t)
+  const longest = series.reduce((n, s) => Math.max(n, clip(s.label).length), 0)
+  const RIGHT = compact ? 12 : Math.min(272, 52 + longest * 6.3)
   const TOP = 14
   const BOTTOM = 28
 
@@ -271,6 +328,8 @@ export function TrendChart({ series, min = 1, max = 5, note }: { series: TrendSe
       <div className="relative" ref={ref}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
+          width={W}
+          height={H}
           className="h-auto w-full"
           role="img"
           aria-label={`Progress over time for ${series.map((s) => s.label).join(', ')}`}
@@ -284,13 +343,16 @@ export function TrendChart({ series, min = 1, max = 5, note }: { series: TrendSe
             </g>
           ))}
 
-          {series.map((s, i) =>
-            s.target !== undefined ? (
-              <g key={`t-${s.id}`}>
-                <line x1={LEFT} x2={W - RIGHT} y1={y(s.target)} y2={y(s.target)} stroke={SERIES[i % SERIES.length]} strokeWidth={1.5} strokeDasharray="5 5" opacity={0.5} />
-              </g>
-            ) : null,
-          )}
+          {[...new Set(series.map((s) => s.target).filter((t): t is number => t !== undefined))].map((t) => (
+            <g key={`target-${t}`}>
+              <line x1={LEFT} x2={W - RIGHT} y1={y(t)} y2={y(t)} stroke={AXIS} strokeWidth={1.5} strokeDasharray="5 5" />
+              {compact ? null : (
+                <text x={LEFT + 4} y={y(t) - 5} fontSize={10.5} fill={MUTED}>
+                  target {t.toFixed(1)}
+                </text>
+              )}
+            </g>
+          ))}
 
           {hover ? <line x1={x(hover)} x2={x(hover)} y1={TOP} y2={H - BOTTOM} stroke={AXIS} strokeWidth={1} /> : null}
 
@@ -311,6 +373,8 @@ export function TrendChart({ series, min = 1, max = 5, note }: { series: TrendSe
                 {last ? (
                   <>
                     <circle cx={x(last.date)} cy={y(last.value)} r={4.5} fill={color} stroke={SURFACE} strokeWidth={2} />
+                    {compact ? null : (
+                      <>
                     {Math.abs(labelY - y(last.value)) > 2 ? (
                       <path
                         d={`M${x(last.date) + 6},${y(last.value)} L${W - RIGHT + 4},${labelY}`}
@@ -319,8 +383,10 @@ export function TrendChart({ series, min = 1, max = 5, note }: { series: TrendSe
                     ) : null}
                     <text x={W - RIGHT + 10} y={labelY + 3.5} fontSize={11.5} fill="var(--color-ink)">
                       <tspan className="tabular" fontWeight={600}>{last.value.toFixed(1)}</tspan>
-                      <tspan dx={5} fill="var(--color-ink-2)">{s.label.length > 24 ? `${s.label.slice(0, 23)}…` : s.label}</tspan>
+                      <tspan dx={5} fill="var(--color-ink-2)">{clip(s.label)}</tspan>
                     </text>
+                      </>
+                    )}
                   </>
                 ) : null}
               </g>
@@ -336,7 +402,7 @@ export function TrendChart({ series, min = 1, max = 5, note }: { series: TrendSe
           </text>
         </svg>
         {layer}
-        {series.length > 1 ? <Legend items={series.map((s, i) => ({ label: s.label, color: SERIES[i % SERIES.length] }))} /> : null}
+        {series.length > 1 || compact ? <Legend items={series.map((s, i) => ({ label: s.label, color: SERIES[i % SERIES.length] }))} /> : null}
       </div>
     </ChartFrame>
   )
