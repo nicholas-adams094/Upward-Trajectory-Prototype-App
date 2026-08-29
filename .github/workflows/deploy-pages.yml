@@ -1,0 +1,64 @@
+name: Deploy to GitHub Pages
+
+# One-time setup by a repository admin, which no workflow token can do for you:
+#   Settings → Pages → Build and deployment → Source: "GitHub Actions"
+# Without it, the deploy job fails with "Resource not accessible by integration".
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once; let a newer push supersede a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Project pages are served from /<repo>/, so the build needs that prefix.
+      BASE_PATH: /${{ github.event.repository.name }}/
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check the seeded demo data is internally consistent
+        run: npm run check:data
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify the build carries the Pages sub-path
+        # A wrong base path deploys a blank page rather than failing, so assert it.
+        run: |
+          grep -q "src=\"${BASE_PATH}assets/" dist/index.html \
+            || { echo "::error::dist/index.html does not reference ${BASE_PATH}assets/"; exit 1; }
+          test -f dist/404.html || { echo "::error::missing dist/404.html SPA fallback"; exit 1; }
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
