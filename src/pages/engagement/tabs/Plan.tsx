@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useViewer } from '../../../auth/AuthContext'
 import { useDb } from '../../../data/store'
-import { addAction, addGoal, setActionStatus } from '../../../data/actions'
+import { addAction, addGoal, respondToAction, setActionStatus, setMeasureMet } from '../../../data/actions'
 import { can, reportFor } from '../../../lib/permissions'
 import {
-  commitmentStats, formatDate, formatShort, goalProgress, goalsFor, relativeDays, todayIso,
+  awaitingConfirmation, commitmentStats, formatDate, formatShort, goalProgress, goalsFor,
+  relativeDays, todayIso,
 } from '../../../lib/metrics'
 import type { Action, Cadence, Engagement, Goal } from '../../../types'
 import {
@@ -24,6 +25,9 @@ export function Plan({ engagement }: { engagement: Engagement }) {
   const [newAction, setNewAction] = useState<Goal | null>(null)
 
   const goals = goalsFor(db, engagement.id)
+  const confirmable = db.settings.requireReinforcementConfirmation
+    ? awaitingConfirmation(db, engagement.id)
+    : []
   const isCoach = viewer.role === 'coach'
   const isManager = viewer.id === engagement.managerId
   const isClient = viewer.id === engagement.clientId
@@ -34,7 +38,7 @@ export function Plan({ engagement }: { engagement: Engagement }) {
       <>
         <EmptyState
           title="The coaching plan has not been built yet"
-          body="The plan turns the report's 'what we need more of' into named goals, each with behavioural measures, weekly commitments for the client and reinforcement actions for their manager."
+          body="Goals, measures and commitments appear here once the coach builds the plan."
           action={isCoach ? <Button variant="primary" onClick={() => setNewGoal(true)}>Add the first goal</Button> : undefined}
         />
         {newGoal && <GoalModal engagement={engagement} onClose={() => setNewGoal(false)} />}
@@ -44,25 +48,36 @@ export function Plan({ engagement }: { engagement: Engagement }) {
 
   return (
     <div className="space-y-5">
-      {isManager && (
-        <div className="rounded-xl border border-hairline bg-accent-soft/60 px-4 py-3.5">
-          <p className="text-[13.5px] font-semibold text-ink">Your part of the plan</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
-            An hour a week with a coach does not change behaviour on its own. The reinforcement actions
-            below are yours — they are what turn a coaching goal into something the team actually
-            experiences.
-          </p>
-        </div>
+      {isClient && confirmable.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Confirm reinforcement"
+            subtitle={`${confirmable.length} action${confirmable.length === 1 ? '' : 's'} your manager recorded`}
+          />
+          <CardBody>
+            <ul className="space-y-2.5">
+              {confirmable.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline/60 pb-2.5 last:border-0 last:pb-0">
+                  <span className="min-w-0 text-[13px] leading-snug text-ink">
+                    {a.title}
+                    <span className="ml-1.5 text-[12px] text-muted">{formatShort(a.completedOn ?? a.dueOn)}</span>
+                  </span>
+                  <span className="flex shrink-0 gap-2">
+                    <Button size="sm" variant="primary" onClick={() => respondToAction(a.id, 'confirmed', viewer)}>Happened</Button>
+                    <Button size="sm" onClick={() => respondToAction(a.id, 'disputed', viewer)}>Did not</Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-3xl text-[12.5px] leading-relaxed text-muted">
-          Every goal is rated on the same 1–5 behavioural anchors as the 360. The baseline is the
-          observed starting point for that specific behaviour, agreed at the report debrief — it is
-          narrower than the competency&rsquo;s 360 average, which covers the whole competency.
-        </p>
-        {isCoach && <Button variant="primary" size="sm" onClick={() => setNewGoal(true)}>Add a goal</Button>}
-      </div>
+      {isCoach && (
+        <div className="flex justify-end">
+          <Button variant="primary" size="sm" onClick={() => setNewGoal(true)}>Add a goal</Button>
+        </div>
+      )}
 
       {goals.map((goal) => {
         const p = goalProgress(goal, db.checkIns)
@@ -97,11 +112,31 @@ export function Plan({ engagement }: { engagement: Engagement }) {
               </div>
 
               <div>
-                <h3 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">How we will know it worked</h3>
-                <ul className="mt-1.5 space-y-1">
-                  {goal.measures.map((m, mi) => (
-                    <li key={mi} className="flex gap-2 text-[13px] leading-relaxed text-ink-2">
-                      <span className="mt-0.5 shrink-0 text-muted" aria-hidden="true">□</span>{m}
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">Measures</h3>
+                  <span className="tabular text-[12px] text-muted">
+                    {goal.measures.filter((m) => m.metOn).length} of {goal.measures.length} met
+                  </span>
+                </div>
+                <ul className="mt-1.5 space-y-1.5">
+                  {goal.measures.map((m) => (
+                    <li key={m.id} className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-6 w-6 shrink-0 accent-[var(--color-accent)]"
+                        checked={!!m.metOn}
+                        disabled={!isCoach && !isManager}
+                        onChange={(e) => setMeasureMet(goal.id, m.id, e.target.checked, viewer)}
+                        aria-label={m.text}
+                      />
+                      <span className="min-w-0 leading-snug">
+                        <span className={`block text-[13px] ${m.metOn ? 'text-muted line-through' : 'text-ink-2'}`}>{m.text}</span>
+                        {m.metOn && (
+                          <span className="block text-[11.5px] text-muted">
+                            met {formatShort(m.metOn)}{m.metBy ? ` · ${db.users.find((u) => u.id === m.metBy)?.name ?? ''}` : ''}
+                          </span>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -118,7 +153,11 @@ export function Plan({ engagement }: { engagement: Engagement }) {
                   />
                   <ActionColumn
                     title="Manager reinforcement"
-                    subtitle={`${Math.round(commitmentStats(actions, 'manager').rate * 100)}% follow-through`}
+                    subtitle={
+                      db.settings.requireReinforcementConfirmation
+                        ? `${Math.round(commitmentStats(actions, 'manager').rate * 100)}% logged · ${Math.round(commitmentStats(actions, 'manager').confirmedRate * 100)}% confirmed`
+                        : `${Math.round(commitmentStats(actions, 'manager').rate * 100)}% follow-through`
+                    }
                     actions={managerActions}
                     canTick={isManager || isCoach}
                     onAdd={isCoach ? () => setNewAction(goal) : undefined}
@@ -128,7 +167,7 @@ export function Plan({ engagement }: { engagement: Engagement }) {
               ) : (
                 <Restricted
                   what="Individual commitments"
-                  why="HR sees the goals and the movement against them. The week-to-week commitments stay between the client, their manager and the coach."
+                  why="Goals and movement are shared with your role; week-to-week commitments are not."
                 />
               )}
             </CardBody>
@@ -142,7 +181,7 @@ export function Plan({ engagement }: { engagement: Engagement }) {
   )
 }
 
-/** Recurring actions repeat weekly; show the live one plus the recent history. */
+/** Show the live occurrence plus the recent history of the series. */
 function collapse(actions: Action[]) {
   return [...actions].sort((a, b) => (a.dueOn < b.dueOn ? 1 : -1)).slice(0, 6)
 }
@@ -194,6 +233,13 @@ function ActionColumn({
                       ? `missed ${formatShort(a.dueOn)}`
                       : `due ${relativeDays(a.dueOn)}`}
                   {overdue && <span className="ml-1 font-medium text-[#a12d2d]">overdue</span>}
+                  {a.owner === 'manager' && a.status === 'done' && (
+                    a.confirmedOn
+                      ? <span className="ml-1 font-medium text-[#0a6b0a]">· confirmed</span>
+                      : a.disputedOn
+                        ? <span className="ml-1 font-medium text-[#a12d2d]">· not experienced</span>
+                        : <span className="ml-1">· unconfirmed</span>
+                  )}
                 </span>
                 {a.detail && a.status === 'open' && <span className="mt-0.5 block text-[12px] leading-snug text-ink-2">{a.detail}</span>}
               </span>
@@ -232,8 +278,8 @@ function GoalModal({ engagement, onClose }: { engagement: Engagement; onClose: (
               addGoal({
                 engagementId: engagement.id, title: title.trim(), description, competencyId,
                 baseline, target,
-                targetDate: new Date(Date.now() + 42 * 86_400_000).toISOString().slice(0, 10),
-                measures: measures.split('\n').map((m) => m.trim()).filter(Boolean),
+                measures: measures.split('\n').map((m) => m.trim()).filter(Boolean)
+                  .map((text, i) => ({ id: `m-${Date.now()}-${i}`, text })),
               }, viewer)
               onClose()
             }}
@@ -245,7 +291,7 @@ function GoalModal({ engagement, onClose }: { engagement: Engagement; onClose: (
     >
       {report && report.doMoreOf.length > 0 && (
         <div className="mb-4 rounded-lg border border-hairline bg-surface-2 px-3.5 py-3">
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">From the report — what we need more of</p>
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">From the report</p>
           <ul className="mt-1.5 space-y-1">
             {report.doMoreOf.map((d) => (
               <li key={d}>
@@ -268,17 +314,17 @@ function GoalModal({ engagement, onClose }: { engagement: Engagement; onClose: (
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Baseline" hint="Where the 360 put them today.">
+          <Field label="Baseline">
             <input className={inputClass} type="number" min={1} max={5} step={0.1} value={baseline} onChange={(e) => setBaseline(Number(e.target.value))} />
           </Field>
-          <Field label="Target" hint="Where good looks like at close.">
+          <Field label="Target">
             <input className={inputClass} type="number" min={1} max={5} step={0.1} value={target} onChange={(e) => setTarget(Number(e.target.value))} />
           </Field>
         </div>
         {target <= baseline && (
           <p className="text-[12.5px] text-[#a12d2d]">The target must be above the baseline, or progress can never be shown.</p>
         )}
-        <Field label="How we will know it worked" hint="One measure per line.">
+        <Field label="Measures" hint="One per line.">
           <textarea className={inputClass} rows={3} value={measures} onChange={(e) => setMeasures(e.target.value)} />
         </Field>
       </div>
@@ -288,10 +334,11 @@ function GoalModal({ engagement, onClose }: { engagement: Engagement; onClose: (
 
 function ActionModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
   const viewer = useViewer()
+  const db = useDb()
   const [owner, setOwner] = useState<Action['owner']>('client')
   const [title, setTitle] = useState('')
   const [detail, setDetail] = useState('')
-  const [cadence, setCadence] = useState<Cadence>('weekly')
+  const [cadence, setCadence] = useState<Cadence>(db.settings.defaultManagerCadence)
 
   return (
     <Modal
@@ -307,7 +354,6 @@ function ActionModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
             onClick={() => {
               addAction({
                 goalId: goal.id, engagementId: goal.engagementId, owner, title: title.trim(), detail, cadence,
-                dueOn: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10),
               }, viewer)
               onClose()
             }}
@@ -318,7 +364,7 @@ function ActionModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
       }
     >
       <div className="space-y-4">
-        <Field label="Owner" hint="Manager actions are the reinforcement that happens between coaching sessions.">
+        <Field label="Owner">
           <select className={inputClass} value={owner} onChange={(e) => setOwner(e.target.value as Action['owner'])}>
             <option value="client">Client</option>
             <option value="manager">Manager</option>

@@ -157,6 +157,41 @@ export function Meter({ value, label, tone = 'accent' }: { value: number; label?
   )
 }
 
+/** The overall score expanded into the weighted inputs that produced it. */
+export function ScoreBreakdown({
+  overall, components,
+}: {
+  overall: number
+  components: { key: string; label: string; weight: number; value: number; contribution: number; detail: string }[]
+}) {
+  return (
+    <div>
+      <div className="mb-3 flex items-baseline gap-2">
+        <span className="tabular text-[32px] font-semibold leading-none tracking-tight text-ink">{overall}%</span>
+        <span className="text-[12.5px] text-muted">overall</span>
+      </div>
+      <ul className="space-y-2.5">
+        {components.map((c) => (
+          <li key={c.key}>
+            <div className="flex items-baseline justify-between gap-3 text-[12.5px]">
+              <span className="min-w-0 text-ink-2">
+                {c.label}
+                <span className="ml-1.5 tabular text-muted">×{Math.round(c.weight * 100)}%</span>
+              </span>
+              <span className="tabular shrink-0 font-semibold text-ink">+{c.contribution}</span>
+            </div>
+            <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-[#eeedea]">
+              <div className="h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${c.contribution}%` }} />
+              <div className="h-full bg-[#eeedea]" style={{ width: `${Math.round(c.weight * 100) - c.contribution}%` }} />
+            </div>
+            <p className="mt-0.5 text-[11.5px] text-muted">{c.detail}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function StatTile({ label, value, unit, foot, tone }: { label: string; value: string | number; unit?: string; foot?: ReactNode; tone?: 'good' | 'critical' | 'warning' }) {
   const color = tone === 'good' ? 'text-[#0a6b0a]' : tone === 'critical' ? 'text-[#a12d2d]' : tone === 'warning' ? 'text-[#8a5b00]' : 'text-ink'
   return (

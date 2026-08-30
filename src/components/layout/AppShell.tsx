@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../../auth/AuthContext'
-import { useDb, resetDemoData } from '../../data/store'
+import { useDb } from '../../data/store'
 import { ROLE_LABELS } from '../../lib/metrics'
 import { visibleEngagements } from '../../lib/permissions'
 import { Avatar } from '../ui/primitives'
@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       : []),
     ...(user.role === 'manager' ? [{ to: '/team', label: 'My team', end: true }] : []),
     ...(user.role === 'hr' ? [{ to: '/org', label: 'Organisation', end: true }, { to: '/org/people', label: 'People' }] : []),
-    { to: '/access', label: 'Who sees what' },
+    { to: '/settings', label: 'Settings' },
   ]
 
   return (
@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </>
           )}
           <div className="!mt-4 border-t border-white/10 pt-3">
-            <NavItem to="/access" label="Who sees what" />
+            <NavItem to="/settings" label="Settings" />
           </div>
         </nav>
 
@@ -95,16 +95,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <button
-            onClick={() => { signOut(); navigate('/login') }}
+            onClick={() => { signOut(); navigate('/login', { replace: true }) }}
             className="mt-1 w-full rounded-lg px-3 py-1.5 text-left text-[12.5px] text-white/60 hover:bg-white/8 hover:text-white"
           >
             Switch user
-          </button>
-          <button
-            onClick={() => { if (confirm('Reset all demo data to its seeded state?')) resetDemoData() }}
-            className="w-full rounded-lg px-3 py-1.5 text-left text-[12.5px] text-white/70 hover:bg-white/8 hover:text-white"
-          >
-            Reset demo data
           </button>
         </div>
       </aside>
@@ -115,13 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="text-[13.5px] font-semibold text-ink">Upward Trajectory</span>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => { if (confirm('Reset all demo data to its seeded state?')) resetDemoData() }}
-                className="rounded-lg px-2.5 py-2 text-[12.5px] text-ink-2"
-              >
-                Reset
-              </button>
-              <button
-                onClick={() => { signOut(); navigate('/login') }}
+                onClick={() => { signOut(); navigate('/login', { replace: true }) }}
                 className="rounded-lg px-2.5 py-2 text-[12.5px] font-medium text-accent"
               >
                 Switch user

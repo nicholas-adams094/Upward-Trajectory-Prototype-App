@@ -19,7 +19,7 @@ export function ManagerDashboard() {
   const engagements = visibleEngagements(db, viewer)
 
   if (!engagements.length) {
-    return <EmptyState title="Nobody on your team is in coaching yet" body="When one of your people starts an engagement with Upward Trajectory, their plan and your reinforcement actions appear here." />
+    return <EmptyState title="Nobody on your team is in coaching yet" body="Plans and reinforcement actions appear here once someone on your team starts an engagement." />
   }
 
   const allActions = db.actions.filter((a) => engagements.some((e) => e.id === a.engagementId))
@@ -35,7 +35,7 @@ export function ManagerDashboard() {
       <PageHeader
         eyebrow="My team"
         title="Reinforcement dashboard"
-        subtitle="Coaching happens for an hour a week. Reinforcement happens in every 1:1, every ops review and every piece of feedback you give in between — that half is yours."
+        subtitle="The people you manage who are in coaching, and your part of their plan."
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -140,7 +140,7 @@ export function ManagerDashboard() {
 
         <div className="space-y-5">
           <Card>
-            <CardHeader title="Your reinforcement actions" subtitle="Tick these off as you do them — the coach and HR see the follow-through, not the detail." />
+            <CardHeader title="Your reinforcement actions" />
             <CardBody>
               <ul className="space-y-3">
                 {dueNow.map(({ a, e }) => {
@@ -172,11 +172,10 @@ export function ManagerDashboard() {
           </Card>
 
           <Card>
-            <CardHeader title="What you can and cannot see" />
-            <CardBody className="space-y-2 text-[12.5px] leading-relaxed text-ink-2">
-              <p><span className="font-medium text-ink">You see</span> the plan, the goals, movement over time and the report once it is released.</p>
-              <p><span className="font-medium text-ink">You do not see</span> individual 360 responses, written comments, the Enneagram narrative or anything said in a coaching session.</p>
-              <Link to="/access" className="inline-block font-medium text-accent hover:underline">The full matrix →</Link>
+            <CardHeader title="Your access" action={<Link to="/settings" className="text-[12.5px] font-medium text-accent hover:underline">Settings →</Link>} />
+            <CardBody className="space-y-1.5 text-[12.5px] leading-snug text-ink-2">
+              <p><span className="font-medium text-ink">Visible</span> — the plan, goals, movement, commitments, released reports.</p>
+              <p><span className="font-medium text-ink">Withheld</span> — 360 responses and comments, Enneagram, session notes.</p>
             </CardBody>
           </Card>
 

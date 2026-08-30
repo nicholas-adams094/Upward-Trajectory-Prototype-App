@@ -43,7 +43,7 @@ npm run dev      # http://localhost:5173
 Six seeded engagements sit at different points of the lifecycle, so every state in the product is
 reachable without clicking anything: **Amara Osei** is at intake, **Tobi Adeyemi** is mid-assessment
 with raters outstanding, **Lena Ortiz** has a report in draft, **Marcus Bell** and **Nadia Kovacs**
-are in active coaching, and **Glen Harper** has finished and moved to sustain.
+are in active coaching, and **Glen Harper** is in sustain with a completed re-measure 360 behind him.
 
 | | |
 |---|---|
@@ -53,6 +53,8 @@ are in active coaching, and **Glen Harper** has finished and moved to sustain.
 | **Self-perception against the organisation** | **The synthesis report** |
 | ![Progress over time](docs/05-progress.png) | ![HR portfolio](docs/08-hr-portfolio.png) |
 | **Every check-in from all three parties** | **HR's portfolio view** |
+| ![Coaching plan](docs/09-coaching-plan.png) | ![Re-measure](docs/10-re-measure.png) |
+| **The coaching plan, with the manager's half of it** | **The re-measure: movement the raters scored** |
 
 ## The lifecycle it models
 
@@ -69,22 +71,39 @@ are in active coaching, and **Glen Harper** has finished and moved to sustain.
    reinforcement actions for the manager**.
 4. **Progress.** The coach, the client and the manager all log check-ins against the same 1–5 scale.
    Every rating plots on one chart, so the disagreement between them is visible rather than averaged
-   away.
+   away. Reinforcement the manager records is put back to the client to confirm, so follow-through is
+   reported as *logged* and *confirmed* rather than taken on trust.
+5. **Re-measure and hand over.** The same 360 panel is asked again in a second wave, and the movement
+   shown is the movement those raters scored — not movement the coaching team logged about itself.
+   Closing an engagement writes a handover: what the manager now owns, which goals stay live, a review
+   date, and an acknowledgement from the manager and the client.
 
 ## The confidentiality model
 
 This is the part a shared portal lives or dies on, so it is a first-class object:
 [`src/lib/permissions.ts`](src/lib/permissions.ts) holds a single `can(resource, context)` function
-that every screen calls, and the app renders the matrix itself at **Who sees what** (`/access`).
+that every screen calls, and it reads a matrix the coach can **edit** at **Settings** (`/settings`) —
+sixteen kinds of data × four roles, each set to *always*, *on release* or *never*. Changing a cell
+takes effect immediately, on every screen and for every signed-in role.
 
-![Who sees what](docs/06-who-sees-what.png)
+![Settings — who sees what](docs/06-settings.png)
 
-Three rules drive it:
+A few cells are locked, because no setting should be able to undo them: the coach owns the engagement
+record, and raw 360 responses would identify the raters. Everything else is open, and choices that
+break the coaching contract are named in a live **confidentiality warnings** panel rather than
+silently prevented.
+
+Settings also carries the anonymity floor (how many responses a rater group needs before its scores
+are shown), the default audience for a published report, the plan defaults, and whether the client is
+asked to confirm the reinforcement their manager records.
+
+Three rules drive the defaults:
 
 - **Raw feedback stays in the coaching room.** Only the coach ever sees a 360 response attributed to
-  its author. The client gets the roll-up and the unattributed comments. Rater groups with fewer than
-  two responses are suppressed so no individual can be identified by arithmetic — the manager column
-  is the deliberate exception, since a 360 rating from your manager is attributed by design.
+  its author. The client gets the roll-up and the unattributed comments. Rater groups below the
+  anonymity floor are suppressed so no individual can be identified by arithmetic — and the pooled
+  "everyone else" average excludes them too, or it would give them away. The manager column is the
+  deliberate exception, since a 360 rating from your manager is attributed by design.
 - **Nothing travels upward until the coach releases it.** The report is a draft until published, and
   publishing names its audience. Withdrawing it revokes manager and HR access immediately.
 - **Progress is shared; the process is not.** Managers and HR see goals, commitments and movement —
@@ -98,6 +117,11 @@ Every screen is interactive and every change persists (to `localStorage`).
 - Complete a self-evaluation, enter a CliftonStrengths top five or an Enneagram result
 - Invite a 360 rater and fill in their form
 - Write, edit, publish, re-publish and withdraw a synthesis report, choosing its audience
+- Print the report or save it as a PDF
+- Open a re-measure 360 wave and compare it against the baseline
+- Tick off a goal's behavioural measures as they are actually observed
+- Close an engagement, write the handover and acknowledge it as the manager
+- Change who sees what, and watch the app obey it immediately
 - Add goals and commitments; tick off client commitments and manager reinforcement actions
 - Log a check-in as any of the three roles that can, and watch the trend chart move
 - Log a coaching session with separate shared and private notes
@@ -158,10 +182,10 @@ src/
   data/seed.ts          seeded demo data (fixed "today", deterministic jitter)
   data/store.ts         localStorage-backed store + useDb()
   data/actions.ts       every mutation in the app
-  lib/permissions.ts    can() and the visibility matrix
+  lib/permissions.ts    can(), the editable visibility matrix and its defaults
   lib/metrics.ts        progress, roll-ups, org analytics
   components/charts/    dumbbell, trend, bar list, phase track, sparkline
-  pages/                sign-in, four dashboards, engagement workspace
+  pages/                sign-in, four dashboards, engagement workspace, settings
 ```
 
 ```bash
@@ -177,7 +201,10 @@ Deliberately out of scope, and what production would need:
 - **Authentication is a person picker.** Real accounts, SSO and per-organisation tenancy would sit in
   front of the same permission model.
 - **Data is per-browser.** A real deployment needs a server, a database and an audit log of every
-  release and withdrawal of a report.
+  release and withdrawal of a report — and of every change to the visibility matrix, which is
+  recorded here only as a "last changed" stamp.
+- **Settings are portal-wide.** In production the matrix would be scoped per client organisation, so
+  one company's confidentiality terms could differ from another's.
 - **360 forms are opened from inside the app.** In production each rater gets a one-time link by
   email and never sees the portal.
 - **CliftonStrengths and Enneagram results are entered by hand** rather than imported from Gallup or

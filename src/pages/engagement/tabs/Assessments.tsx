@@ -29,7 +29,9 @@ export function Assessments({ engagement }: { engagement: Engagement }) {
   const [modal, setModal] = useState<null | { kind: 'self' | 'clifton' | 'enneagram' | 'invite' } | { kind: 'rate'; respondentId: string }>(null)
 
   const assessments = db.assessments.filter((a) => a.engagementId === engagement.id)
-  const a360 = assessments.find((a) => a.kind === 'feedback360')
+  const feedbackRounds = assessments.filter((a) => a.kind === 'feedback360').sort((x, y) => y.round - x.round)
+  const a360 = feedbackRounds[0]
+  const waves = feedbackRounds.length
   const raters = a360 ? db.respondents.filter((r) => r.assessmentId === a360.id) : []
   const submitted = raters.filter((r) => r.status === 'submitted').length
 
@@ -44,7 +46,11 @@ export function Assessments({ engagement }: { engagement: Engagement }) {
           return (
             <Card key={a.id}>
               <CardHeader
-                title={ASSESSMENT_LABELS[a.kind]}
+                title={
+                  a.kind === 'feedback360' && waves > 1
+                    ? `${ASSESSMENT_LABELS[a.kind]} — ${db.waves.find((w) => w.round === a.round)?.label ?? `wave ${a.round}`}`
+                    : ASSESSMENT_LABELS[a.kind]
+                }
                 subtitle={KIND_BLURB[a.kind]}
                 action={<StatusPill status={a.status} />}
               />
@@ -371,7 +377,7 @@ function EnneagramModal({ engagement, onClose }: { engagement: Engagement; onClo
         <Field label="In growth">
           <textarea className={inputClass} rows={2} value={inGrowth} onChange={(e) => setGrowth(e.target.value)} />
         </Field>
-        <Field label="Leadership blind spot" hint="The behavioural implication the coaching plan will work on.">
+        <Field label="Leadership blind spot">
           <textarea className={inputClass} rows={2} value={blindSpot} onChange={(e) => setBlind(e.target.value)} />
         </Field>
       </div>

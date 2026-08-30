@@ -34,7 +34,7 @@ export function CoachDashboard() {
       <PageHeader
         eyebrow="Upward Trajectory"
         title="Practice dashboard"
-        subtitle="Every engagement, what needs your attention, and whether the managers are doing their half of the work."
+        subtitle="Every engagement, ranked by what needs you next."
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -59,7 +59,7 @@ export function CoachDashboard() {
         <div className="space-y-5">
           {analytics.atRisk.length > 0 && (
             <Card>
-              <CardHeader title="Needs your attention" subtitle="Ranked by what will stall the engagement soonest." />
+              <CardHeader title="Needs your attention" />
               <CardBody>
                 <ul className="divide-y divide-hairline">
                   {analytics.atRisk.map(({ engagement, reason }) => {
@@ -83,7 +83,7 @@ export function CoachDashboard() {
           )}
 
           <Card>
-            <CardHeader title="The book" subtitle="Every engagement with its phase and composite progress." />
+            <CardHeader title="The book" />
             <CardBody>
               <ul className="divide-y divide-hairline">
                 {engagements.map((e) => {
@@ -152,7 +152,7 @@ export function CoachDashboard() {
 
           {outstandingRaters.length > 0 && (
             <Card>
-              <CardHeader title="Chasing 360 raters" subtitle="Assessment windows that are still open." />
+              <CardHeader title="Open 360 windows" />
               <CardBody>
                 <ul className="space-y-3">
                   {outstandingRaters.map(({ engagement, waiting, dueOn }) => {
@@ -173,13 +173,13 @@ export function CoachDashboard() {
           )}
 
           <Card>
-            <CardHeader title="Reinforcement by manager" subtitle="Who is doing their half of the work." />
+            <CardHeader title="Reinforcement by manager" />
             <CardBody>
               <BarList
                 rows={analytics.reinforcementByManager.map((m) => ({ label: m.name, value: m.rate, sub: `${m.clients} client${m.clients > 1 ? 's' : ''}` }))}
                 max={100}
                 suffix="%"
-                note="Manager reinforcement actions completed by their due date."
+                note="Completed by their due date"
               />
             </CardBody>
           </Card>

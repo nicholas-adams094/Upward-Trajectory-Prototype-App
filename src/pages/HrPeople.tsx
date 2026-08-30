@@ -16,7 +16,7 @@ export function HrPeople() {
       <PageHeader
         eyebrow="Talent"
         title="People in coaching"
-        subtitle="Engagement status, plan progress and manager reinforcement for everyone you sponsor. Content stays with the coach."
+        subtitle="Status, progress and reinforcement for everyone you sponsor."
       />
       <Card>
         <CardBody>

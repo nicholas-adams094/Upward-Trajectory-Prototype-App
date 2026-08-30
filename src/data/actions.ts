@@ -2,8 +2,13 @@ import { mutate } from './store'
 import { newId } from '../lib/ids'
 import { todayIso } from '../lib/metrics'
 import type {
-  Action, CheckIn, CliftonTheme, EnneagramResult, Goal, Phase, Ratings, Role, SynthesisReport, User,
+  Action, CheckIn, CliftonTheme, EnneagramResult, Goal, Phase, PortalSettings, Ratings,
+  Role, SynthesisReport, User,
 } from '../types'
+import { CADENCE_DAYS } from '../types'
+
+const addDays = (iso: string, days: number) =>
+  new Date(new Date(`${iso}T00:00:00Z`).getTime() + days * 86_400_000).toISOString().slice(0, 10)
 
 const logActivity = (
   draft: Parameters<Parameters<typeof mutate>[0]>[0],
@@ -23,13 +28,63 @@ export function setActionStatus(actionId: string, status: Action['status'], acto
     if (!a) return
     a.status = status
     a.completedOn = status === 'done' ? todayIso() : undefined
+    // Reopening clears any claim that was made about it.
+    if (status === 'open') {
+      a.confirmedBy = undefined
+      a.confirmedOn = undefined
+      a.disputedOn = undefined
+    }
     logActivity(db, a.engagementId, actor.id, 'action', `${actor.name} marked "${a.title}" as ${status}.`)
+
+    // A weekly commitment that is closed and never reappears was never weekly.
+    // Settling one occurrence schedules the next one in its series.
+    if (status === 'open' || a.cadence === 'once') return
+    const later = db.actions.filter((x) => x.seriesId === a.seriesId && x.occurrence > a.occurrence)
+    if (later.length) return
+    db.actions.push({
+      ...a,
+      id: newId('ac'),
+      occurrence: a.occurrence + 1,
+      dueOn: addDays(a.dueOn > todayIso() ? a.dueOn : todayIso(), CADENCE_DAYS[a.cadence]),
+      status: 'open',
+      completedOn: undefined,
+      confirmedBy: undefined,
+      confirmedOn: undefined,
+      disputedOn: undefined,
+    })
   })
 }
 
-export function addAction(input: Omit<Action, 'id' | 'status' | 'completedOn'>, actor: User) {
+/** The client says whether a reinforcement action their manager recorded actually happened. */
+export function respondToAction(actionId: string, outcome: 'confirmed' | 'disputed', actor: User) {
   mutate((db) => {
-    db.actions.push({ ...input, id: newId('ac'), status: 'open' })
+    const a = db.actions.find((x) => x.id === actionId)
+    if (!a) return
+    a.confirmedBy = outcome === 'confirmed' ? actor.id : undefined
+    a.confirmedOn = outcome === 'confirmed' ? todayIso() : undefined
+    a.disputedOn = outcome === 'disputed' ? todayIso() : undefined
+    logActivity(
+      db, a.engagementId, actor.id, 'action',
+      outcome === 'confirmed'
+        ? `${actor.name} confirmed reinforcement they experienced.`
+        : `${actor.name} recorded that reinforcement did not land as logged.`,
+    )
+  })
+}
+
+export function addAction(
+  input: Omit<Action, 'id' | 'status' | 'completedOn' | 'seriesId' | 'occurrence' | 'dueOn'>,
+  actor: User,
+) {
+  mutate((db) => {
+    db.actions.push({
+      ...input,
+      id: newId('ac'),
+      seriesId: newId('sr'),
+      occurrence: 1,
+      dueOn: addDays(todayIso(), db.settings.commitmentLeadDays),
+      status: 'open',
+    })
     logActivity(db, input.engagementId, actor.id, 'action', `${actor.name} added a ${input.owner} commitment: ${input.title}`)
   })
 }
@@ -63,10 +118,32 @@ export function addCheckIn(input: { goalId: string; engagementId: string; rating
 
 /* ----------------------------------------------------------------- goals */
 
-export function addGoal(input: Omit<Goal, 'id' | 'createdOn' | 'status'>, actor: User) {
+export function addGoal(input: Omit<Goal, 'id' | 'createdOn' | 'status' | 'targetDate'>, actor: User) {
   mutate((db) => {
-    db.goals.push({ ...input, id: newId('g'), createdOn: todayIso(), status: 'not_started' })
+    db.goals.push({
+      ...input,
+      id: newId('g'),
+      createdOn: todayIso(),
+      targetDate: addDays(todayIso(), db.settings.goalHorizonWeeks * 7),
+      status: 'not_started',
+    })
     logActivity(db, input.engagementId, actor.id, 'plan', `Goal added to the coaching plan: ${input.title}`)
+  })
+}
+
+/** Tick a behavioural measure once it has actually been observed. */
+export function setMeasureMet(goalId: string, measureId: string, met: boolean, actor: User) {
+  mutate((db) => {
+    const goal = db.goals.find((g) => g.id === goalId)
+    const measure = goal?.measures.find((m) => m.id === measureId)
+    if (!goal || !measure) return
+    measure.metOn = met ? todayIso() : undefined
+    measure.metBy = met ? actor.id : undefined
+    if (met && goal.measures.every((m) => m.metOn)) {
+      logActivity(db, goal.engagementId, actor.id, 'plan', `Every measure on "${goal.title}" has now been met.`)
+    } else if (met) {
+      logActivity(db, goal.engagementId, actor.id, 'plan', `A measure on "${goal.title}" was met.`)
+    }
   })
 }
 
@@ -206,6 +283,91 @@ export function submitFeedback(respondentId: string, ratings: Ratings, keepDoing
         `360 response received (${submitted} of ${awaited.length} raters in).`,
       )
     }
+  })
+}
+
+/** Open a fresh 360 wave against the roster that answered the last one. */
+export function openFeedbackWave(engagementId: string, actor: User) {
+  mutate((db) => {
+    const prior = db.assessments
+      .filter((a) => a.engagementId === engagementId && a.kind === 'feedback360')
+      .sort((a, b) => b.round - a.round)[0]
+    if (!prior) return
+    const round = prior.round + 1
+
+    const assessmentId = newId('a')
+    db.assessments.push({
+      id: assessmentId, engagementId, kind: 'feedback360', status: 'in_progress', round,
+      assignedOn: todayIso(), dueOn: addDays(todayIso(), 21),
+    })
+    // Carry over everyone who answered last time; a re-measure against a
+    // different room measures the room, not the person.
+    for (const r of db.respondents.filter((r) => r.assessmentId === prior.id && r.status === 'submitted')) {
+      db.respondents.push({
+        id: newId('r'), assessmentId, name: r.name, email: r.email,
+        relationship: r.relationship, status: 'invited', invitedOn: todayIso(),
+      })
+    }
+    if (!db.waves.some((w) => w.round === round)) {
+      db.waves.push({ round, label: `Wave ${round}`, openedOn: todayIso() })
+    }
+    logActivity(db, engagementId, actor.id, 'assessment', `A re-measure 360 was opened (wave ${round}).`)
+  })
+}
+
+/* ------------------------------------------------------ close & handover */
+
+export function closeEngagement(
+  input: { engagementId: string; carriedGoalIds: string[]; summary: string; managerOwns: string; reviewOn: string },
+  actor: User,
+) {
+  mutate((db) => {
+    const e = db.engagements.find((x) => x.id === input.engagementId)
+    if (!e) return
+    e.status = 'complete'
+    e.phase = 'sustain'
+    e.closedOn = todayIso()
+    db.handovers.push({ id: newId('ho'), closedOn: todayIso(), acknowledgedByManagerOn: undefined, ...input })
+    logActivity(db, e.id, actor.id, 'system', 'Engagement closed and handed over to the manager.')
+  })
+}
+
+export function acknowledgeHandover(handoverId: string, actor: User) {
+  mutate((db) => {
+    const h = db.handovers.find((x) => x.id === handoverId)
+    if (!h) return
+    if (actor.role === 'manager') h.acknowledgedByManagerOn = todayIso()
+    if (actor.role === 'client') h.acknowledgedByClientOn = todayIso()
+    logActivity(db, h.engagementId, actor.id, 'system', `${actor.name} acknowledged the handover.`)
+  })
+}
+
+export function reopenEngagement(engagementId: string, actor: User) {
+  mutate((db) => {
+    const e = db.engagements.find((x) => x.id === engagementId)
+    if (!e) return
+    e.status = 'active'
+    e.closedOn = undefined
+    db.handovers = db.handovers.filter((h) => h.engagementId !== engagementId)
+    logActivity(db, engagementId, actor.id, 'system', 'Engagement reopened.')
+  })
+}
+
+export function setEngagementStatus(engagementId: string, status: 'active' | 'paused', actor: User) {
+  mutate((db) => {
+    const e = db.engagements.find((x) => x.id === engagementId)
+    if (!e) return
+    e.status = status
+    e.closedOn = undefined
+    logActivity(db, engagementId, actor.id, 'system', status === 'paused' ? 'Engagement paused.' : 'Engagement resumed.')
+  })
+}
+
+/* ------------------------------------------------------------- settings */
+
+export function updateSettings(patch: Partial<PortalSettings>, actor: User) {
+  mutate((db) => {
+    db.settings = { ...db.settings, ...patch, updatedOn: todayIso(), updatedBy: actor.id }
   })
 }
 

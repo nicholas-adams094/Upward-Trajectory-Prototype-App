@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { Database } from '../types'
+import { DEFAULT_SETTINGS, applyVisibility, normaliseVisibility } from '../lib/permissions'
 import { seedDatabase } from './seed'
 
 const KEY = 'upward-trajectory.db.v1'
@@ -38,12 +39,26 @@ function stampSeeded() {
 const TABLES: (keyof Database)[] = [
   'orgs', 'users', 'competencies', 'engagements', 'assessments', 'respondents', 'responses',
   'clifton', 'enneagram', 'reports', 'goals', 'actions', 'checkIns', 'sessions', 'activity',
+  'waves', 'handovers',
 ]
 
 function isUsable(value: unknown): value is Database {
   if (!value || typeof value !== 'object') return false
   const db = value as Record<string, unknown>
-  return TABLES.every((t) => Array.isArray(db[t])) && (db.users as unknown[]).length > 0
+  return TABLES.every((t) => Array.isArray(db[t]))
+    && !!db.settings && typeof db.settings === 'object'
+    && (db.users as unknown[]).length > 0
+}
+
+/**
+ * Settings are the one table a visitor edits deliberately, so a stored copy is
+ * repaired rather than discarded: anything missing falls back to the default.
+ */
+function withSettings(db: Database): Database {
+  db.settings = { ...DEFAULT_SETTINGS, ...db.settings }
+  db.settings.visibility = normaliseVisibility(db.settings.visibility)
+  applyVisibility(db.settings.visibility)
+  return db
 }
 
 function load(): Database {
@@ -53,12 +68,12 @@ function load(): Database {
       const parsed: unknown = JSON.parse(raw)
       // A visitor who used an earlier build has a store from an older shape.
       // Re-seeding beats crashing on a missing table.
-      if (isUsable(parsed)) return parsed
+      if (isUsable(parsed)) return withSettings(parsed)
     }
   } catch {
     /* fall through to a fresh seed */
   }
-  const fresh = seedDatabase()
+  const fresh = withSettings(seedDatabase())
   persist(fresh)
   stampSeeded()
   return fresh
@@ -92,13 +107,16 @@ export function getDb(): Database {
 export function mutate(fn: (draft: Database) => void) {
   const next: Database = JSON.parse(JSON.stringify(db))
   fn(next)
+  // The matrix drives every `can()` call, so it has to be live before render.
+  next.settings.visibility = normaliseVisibility(next.settings.visibility)
+  applyVisibility(next.settings.visibility)
   db = next
   persist(next)
   emit()
 }
 
 export function resetDemoData() {
-  db = seedDatabase()
+  db = withSettings(seedDatabase())
   persist(db)
   stampSeeded()
   emit()

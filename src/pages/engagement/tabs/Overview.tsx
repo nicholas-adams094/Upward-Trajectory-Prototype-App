@@ -1,13 +1,20 @@
+import { useState } from 'react'
 import { useViewer } from '../../../auth/AuthContext'
 import { useDb } from '../../../data/store'
-import { setPhase } from '../../../data/actions'
+import {
+  acknowledgeHandover, closeEngagement, reopenEngagement, setEngagementStatus, setPhase,
+} from '../../../data/actions'
 import { can, reportFor } from '../../../lib/permissions'
 import {
-  commitmentStats, engagementScore, formatDate, goalProgress, goalsFor, relativeDays, todayIso, userById,
+  commitmentStats, engagementScore, formatDate, goalProgress, goalsFor, measureProgress,
+  relativeDays, todayIso, userById,
 } from '../../../lib/metrics'
 import { PHASES } from '../../../types'
 import type { Engagement, Phase } from '../../../types'
-import { Card, CardBody, CardHeader, Meter, StatTile, StatusPill } from '../../../components/ui/primitives'
+import {
+  Badge, Button, Card, CardBody, CardHeader, Field, Meter, Modal, ScoreBreakdown, StatTile,
+  StatusPill, inputClass,
+} from '../../../components/ui/primitives'
 
 export function Overview({ engagement }: { engagement: Engagement }) {
   const db = useDb()
@@ -17,6 +24,9 @@ export function Overview({ engagement }: { engagement: Engagement }) {
 
   const score = engagementScore(db, engagement)
   const goals = goalsFor(db, engagement.id)
+  const measures = measureProgress(goals)
+  const handover = db.handovers.find((h) => h.engagementId === engagement.id)
+  const [closing, setClosing] = useState(false)
   const actions = db.actions.filter((a) => a.engagementId === engagement.id)
   const clientStats = commitmentStats(actions, 'client')
   const managerStats = commitmentStats(actions, 'manager')
@@ -47,19 +57,60 @@ export function Overview({ engagement }: { engagement: Engagement }) {
             label="Plan movement"
             value={score.plan}
             unit="%"
-            foot={goals.length ? `${goals.length} goal${goals.length > 1 ? 's' : ''} in the plan` : 'No plan yet'}
+            foot={measures.total ? `${measures.met} of ${measures.total} measures met` : goals.length ? `${goals.length} goal${goals.length > 1 ? 's' : ''}` : 'No plan yet'}
           />
           <StatTile
             label="Manager reinforcement"
             value={score.hasReinforcementData ? score.reinforcement : '—'}
             unit={score.hasReinforcementData ? '%' : undefined}
             tone={managerStats.due >= 4 && managerStats.rate < 0.6 ? 'critical' : undefined}
-            foot={managerStats.due ? `${managerStats.done} of ${managerStats.due} actions completed` : 'No actions due yet'}
+            foot={
+              managerStats.due
+                ? db.settings.requireReinforcementConfirmation
+                  ? `${managerStats.confirmed} of ${managerStats.done} confirmed by the client`
+                  : `${managerStats.done} of ${managerStats.due} actions completed`
+                : 'No actions due yet'
+            }
           />
         </div>
 
+        {handover && (
+          <Card>
+            <CardHeader
+              title="Handover"
+              subtitle={`Closed ${formatDate(handover.closedOn)} · review ${formatDate(handover.reviewOn)}`}
+              action={
+                viewer.role === 'coach'
+                  ? <Button size="sm" onClick={() => reopenEngagement(engagement.id, viewer)}>Reopen</Button>
+                  : (viewer.role === 'manager' && !handover.acknowledgedByManagerOn)
+                      || (viewer.role === 'client' && !handover.acknowledgedByClientOn)
+                    ? <Button size="sm" variant="primary" onClick={() => acknowledgeHandover(handover.id, viewer)}>Acknowledge</Button>
+                    : <Badge tone="good">Acknowledged</Badge>
+              }
+            />
+            <CardBody className="space-y-3">
+              <p className="text-[13.5px] leading-relaxed text-ink">{handover.summary}</p>
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">The manager now owns</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-ink-2">{handover.managerOwns}</p>
+              </div>
+              {handover.carriedGoalIds.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {handover.carriedGoalIds.map((gid) => (
+                    <Badge key={gid}>{goals.find((g) => g.id === gid)?.title ?? 'Goal'}</Badge>
+                  ))}
+                </div>
+              )}
+              <p className="text-[12px] text-muted">
+                Manager {handover.acknowledgedByManagerOn ? `acknowledged ${formatDate(handover.acknowledgedByManagerOn)}` : 'not yet acknowledged'} ·{' '}
+                client {handover.acknowledgedByClientOn ? `acknowledged ${formatDate(handover.acknowledgedByClientOn)}` : 'not yet acknowledged'}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+
         <Card>
-          <CardHeader title="The sponsor goal" subtitle="Agreed in the three-way at contracting. Everything downstream is measured against this." />
+          <CardHeader title="Sponsor goal" />
           <CardBody>
             <p className="text-[14px] leading-relaxed text-ink">{engagement.sponsorGoal}</p>
             <p className="mt-3 text-[12.5px] text-muted">
@@ -92,7 +143,7 @@ export function Overview({ engagement }: { engagement: Engagement }) {
         )}
 
         <Card>
-          <CardHeader title="Activity" subtitle="Everything that has happened on this engagement, newest first." />
+          <CardHeader title="Activity" />
           <CardBody>
             <ol className="space-y-3">
               {activity.map((a) => (
@@ -112,6 +163,13 @@ export function Overview({ engagement }: { engagement: Engagement }) {
       </div>
 
       <div className="space-y-5">
+        <Card>
+          <CardHeader title="Progress" />
+          <CardBody>
+            <ScoreBreakdown overall={score.overall} components={score.components} />
+          </CardBody>
+        </Card>
+
         {nextSession && can('session.shared', ctx) && (
           <Card>
             <CardHeader title="Next coaching session" />
@@ -124,10 +182,13 @@ export function Overview({ engagement }: { engagement: Engagement }) {
 
         {can('plan.actions', ctx) && (
           <Card>
-            <CardHeader title="Commitment follow-through" subtitle="Behaviour change happens between the sessions." />
+            <CardHeader title="Commitment follow-through" />
             <CardBody className="space-y-4">
               <Meter label="Client commitments" value={clientStats.rate * 100} />
               <Meter label="Manager reinforcement" value={managerStats.rate * 100} />
+              {db.settings.requireReinforcementConfirmation && managerStats.done > 0 && (
+                <Meter label="Confirmed by the client" value={managerStats.confirmedRate * 100} tone="series" />
+              )}
               {managerStats.overdue > 0 && (
                 <p className="text-[12.5px] leading-snug text-[#a12d2d]">
                   <span aria-hidden="true">! </span>
@@ -140,25 +201,119 @@ export function Overview({ engagement }: { engagement: Engagement }) {
 
         {viewer.role === 'coach' && (
           <Card>
-            <CardHeader title="Move the engagement" subtitle="Coach only." />
-            <CardBody>
+            <CardHeader title="Manage" />
+            <CardBody className="space-y-3">
               <label className="block">
-                <span className="mb-1 block text-[12.5px] font-medium text-ink-2">Current phase</span>
+                <span className="mb-1 block text-[12.5px] font-medium text-ink-2">Phase</span>
                 <select
                   value={engagement.phase}
+                  disabled={engagement.status === 'complete'}
                   onChange={(e) => setPhase(engagement.id, e.target.value as Phase, viewer)}
-                  className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-[13.5px]"
+                  className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-[13.5px] disabled:opacity-50"
                 >
                   {PHASES.map((p) => (
                     <option key={p.id} value={p.id}>{p.label}</option>
                   ))}
                 </select>
               </label>
-              <p className="mt-2 text-[12px] leading-snug text-muted">{PHASES[score.phaseIndex].blurb}</p>
+              <label className="block">
+                <span className="mb-1 block text-[12.5px] font-medium text-ink-2">Status</span>
+                <select
+                  value={engagement.status}
+                  onChange={(e) => {
+                    const next = e.target.value
+                    if (next === 'complete') setClosing(true)
+                    else if (engagement.status === 'complete') reopenEngagement(engagement.id, viewer)
+                    else setEngagementStatus(engagement.id, next as 'active' | 'paused', viewer)
+                  }}
+                  className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-[13.5px]"
+                >
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="complete">Complete</option>
+                </select>
+              </label>
+              {engagement.status !== 'complete' && (
+                <Button className="w-full" onClick={() => setClosing(true)}>Close & hand over</Button>
+              )}
             </CardBody>
           </Card>
         )}
       </div>
+
+      {closing && <CloseModal engagement={engagement} onClose={() => setClosing(false)} />}
     </div>
+  )
+}
+
+function CloseModal({ engagement, onClose }: { engagement: Engagement; onClose: () => void }) {
+  const db = useDb()
+  const viewer = useViewer()
+  const goals = goalsFor(db, engagement.id)
+  const manager = userById(db, engagement.managerId)
+  const [summary, setSummary] = useState('')
+  const [managerOwns, setManagerOwns] = useState('')
+  const [carried, setCarried] = useState<string[]>(goals.filter((g) => g.status !== 'achieved').map((g) => g.id))
+  const [reviewOn, setReviewOn] = useState(
+    new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
+  )
+
+  return (
+    <Modal
+      open
+      title="Close and hand over"
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant="primary"
+            disabled={!summary.trim() || !managerOwns.trim()}
+            onClick={() => {
+              closeEngagement({
+                engagementId: engagement.id, carriedGoalIds: carried,
+                summary: summary.trim(), managerOwns: managerOwns.trim(), reviewOn,
+              }, viewer)
+              onClose()
+            }}
+          >
+            Close engagement
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Where they landed">
+          <textarea className={inputClass} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
+        </Field>
+        <Field label={`What ${manager?.name ?? 'the manager'} carries on`}>
+          <textarea className={inputClass} rows={3} value={managerOwns} onChange={(e) => setManagerOwns(e.target.value)} />
+        </Field>
+        <div>
+          <p className="mb-1.5 text-[12.5px] font-medium text-ink-2">Goals that stay live</p>
+          <ul className="space-y-1.5">
+            {goals.map((g) => (
+              <li key={g.id}>
+                <label className="flex items-center gap-2.5 text-[13px] text-ink">
+                  <input
+                    type="checkbox"
+                    className="h-6 w-6 shrink-0 accent-[var(--color-accent)]"
+                    checked={carried.includes(g.id)}
+                    onChange={(e) => setCarried(
+                      e.target.checked ? [...carried, g.id] : carried.filter((x) => x !== g.id),
+                    )}
+                  />
+                  {g.title}
+                  <StatusPill status={g.status} />
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <Field label="Review date">
+          <input className={inputClass} type="date" value={reviewOn} onChange={(e) => setReviewOn(e.target.value)} />
+        </Field>
+      </div>
+    </Modal>
   )
 }

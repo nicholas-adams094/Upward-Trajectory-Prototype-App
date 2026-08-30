@@ -66,4 +66,31 @@ body {
   .no-print {
     display: none !important;
   }
+
+  /* The report is the only thing worth putting on paper. When one is being
+     printed, everything around it drops out and it flows as a document. */
+  body:has(.print-only-target) .print-hide-when-printing {
+    display: none !important;
+  }
+
+  .print-sheet {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+  }
+
+  .print-sheet article,
+  .print-sheet section,
+  .print-sheet li {
+    break-inside: avoid;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  @page {
+    margin: 18mm 16mm;
+  }
 }

@@ -37,11 +37,11 @@ export function Report({ engagement }: { engagement: Engagement }) {
     return isCoach ? (
       <EmptyState
         title="No synthesis report yet"
-        body="Once the assessments are in, the report is where the 360, the self-evaluation, CliftonStrengths and the Enneagram become one story the client can act on."
+        body="Synthesise the 360, the self-evaluation, CliftonStrengths and the Enneagram into one report."
         action={<Button variant="primary" onClick={() => createDraftReport(engagement.id, viewer)}>Start the report</Button>}
       />
     ) : (
-      <EmptyState title="The report is still being written" body="Your coach synthesises every assessment into a single report. It appears here as soon as it is published." />
+      <EmptyState title="The report is still being written" body="It appears here once your coach publishes it." />
     )
   }
 
@@ -65,12 +65,12 @@ export function Report({ engagement }: { engagement: Engagement }) {
     return viewer.id === engagement.clientId ? (
       <EmptyState
         title="Your coach is still writing this"
-        body="The report pulls your 360, your self-evaluation, your CliftonStrengths and your Enneagram into one picture. It appears here as soon as your coach publishes it."
+        body="It appears here once your coach publishes it."
       />
     ) : (
       <Restricted
         what="The synthesis report"
-        why="This report has not been released in its current form. Nothing reaches you until the coach publishes a version and names its audience."
+        why="Not released in its current form."
       />
     )
   }
@@ -83,8 +83,8 @@ export function Report({ engagement }: { engagement: Engagement }) {
   const topGaps = rollup.filter((r) => r.gap !== null).sort((a, b) => Math.abs(b.gap!) - Math.abs(a.gap!)).slice(0, 3)
 
   return (
-    <div className="space-y-5">
-      <Card>
+    <div className="space-y-5 print-only-target">
+      <Card className="print-sheet">
         <CardHeader
           title={`Synthesis report — version ${report.version}`}
           subtitle={
@@ -97,6 +97,7 @@ export function Report({ engagement }: { engagement: Engagement }) {
               {hasUnpublishedEdits && <Badge tone="warning"><span aria-hidden="true">✎</span> Unpublished edits</Badge>}
               <StatusPill status={report.status} />
               {isCoach && <Button size="sm" onClick={() => setEditing(true)}>Edit</Button>}
+              <Button size="sm" onClick={() => window.print()} title="Print or save as PDF">Print / PDF</Button>
               {isCoach && <Button size="sm" variant="primary" onClick={() => setPublishing(true)}>
                 {report.status === 'published' ? 'Re-publish' : 'Publish'}
               </Button>}
@@ -135,7 +136,7 @@ export function Report({ engagement }: { engagement: Engagement }) {
 
       {topGaps.length > 0 && can('feedback360.rollup', ctx) && (
         <Card>
-          <CardHeader title="The numbers behind the narrative" subtitle="The three largest gaps between self-perception and how the organisation experiences them." />
+          <CardHeader title="Largest gaps" />
           <CardBody>
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {topGaps.map((g) => (
@@ -215,13 +216,13 @@ function EditModal({ report, onClose }: { report: SynthesisReport; onClose: () =
       }
     >
       <div className="space-y-4">
-        <Field label="Headline" hint="One sentence the client will remember six months from now.">
+        <Field label="Headline">
           <textarea className={inputClass} rows={2} value={headline} onChange={(e) => setHeadline(e.target.value)} />
         </Field>
         <Field label="Signature strengths" hint="One per line.">
           <textarea className={inputClass} rows={4} value={strengths} onChange={(e) => setStrengths(e.target.value)} />
         </Field>
-        <Field label="What we need more of" hint="One per line. These become the coaching plan goals.">
+        <Field label="What we need more of" hint="One per line.">
           <textarea className={inputClass} rows={4} value={doMore} onChange={(e) => setDoMore(e.target.value)} />
         </Field>
         <Field label="Watch-outs" hint="One per line.">

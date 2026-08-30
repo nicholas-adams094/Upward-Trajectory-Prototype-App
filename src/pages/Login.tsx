@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useDb } from '../data/store'
 import { ROLE_LABELS } from '../lib/metrics'
@@ -18,12 +18,16 @@ export function Login() {
   const db = useDb()
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  // A shared link to a specific screen should survive the sign-in it triggers.
+  const redirect = (location.state as { from?: { pathname: string; search: string } } | null)?.from
+  const from = redirect && redirect.pathname !== '/login' ? redirect : undefined
 
   const home: Record<Role, string> = { coach: '/coach', client: '/me', manager: '/team', hr: '/org' }
 
   const enter = (id: string, role: Role) => {
     signIn(id)
-    navigate(home[role])
+    navigate(from ? `${from.pathname}${from.search ?? ''}` : home[role], { replace: true })
   }
 
   return (
@@ -88,9 +92,8 @@ export function Login() {
         </div>
 
         <p className="mt-8 max-w-2xl text-[12.5px] leading-relaxed text-white/45">
-          This is a working prototype. There is no real authentication — pick any person to see the
-          portal exactly as they would. All data is seeded demo data stored in your browser; edits you
-          make persist locally and can be reset from the sidebar.
+          Prototype. No real authentication — pick anyone to see the portal as they would.
+          Seeded data lives in your browser and can be reset under Settings.
         </p>
       </div>
     </div>

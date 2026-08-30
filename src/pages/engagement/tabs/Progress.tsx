@@ -23,7 +23,7 @@ export function Progress({ engagement }: { engagement: Engagement }) {
   const canCheckIn = viewer.role === 'coach' || viewer.id === engagement.clientId || viewer.id === engagement.managerId
 
   if (!goals.length) {
-    return <EmptyState title="Nothing to track yet" body="Progress is measured against the coaching plan. Once goals exist, every check-in from the coach, the client and the manager plots here." />
+    return <EmptyState title="Nothing to track yet" body="Check-ins plot here once the plan has goals." />
   }
 
   const series = progress.map((p) => ({
@@ -52,16 +52,16 @@ export function Progress({ engagement }: { engagement: Engagement }) {
       <Card>
         <CardHeader
           title="Movement over time"
-          subtitle="Every goal, every check-in. The dashed line is that goal's target."
+          subtitle="Dashed line is the target"
           action={canCheckIn ? <Button size="sm" variant="primary" onClick={() => setCheckingIn(true)}>Add a check-in</Button> : undefined}
         />
         <CardBody>
-          <TrendChart series={series} note="Ratings use the same 1–5 behavioural anchors as the 360, so a check-in is directly comparable to the baseline." />
+          <TrendChart series={series} note="1–5, same anchors as the 360" />
         </CardBody>
       </Card>
 
       <Card>
-        <CardHeader title="Recent check-ins" subtitle={showNotes ? 'Logged by the person doing it, the person managing them, and the coach.' : 'Ratings only — what was written on a check-in stays in the coaching relationship.'} />
+        <CardHeader title="Recent check-ins" subtitle={showNotes ? undefined : 'Ratings only — notes are not shared with your role.'} />
         <CardBody>
           <ul className="divide-y divide-hairline">
             {recent.map((c) => {
@@ -143,7 +143,7 @@ function CheckInModal({ engagement, onClose }: { engagement: Engagement; onClose
             className="w-full accent-[var(--color-accent)]"
           />
         </Field>
-        <Field label="What did you actually see?" hint="Behaviour, not impression.">
+        <Field label="What did you see?">
           <textarea className={inputClass} rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
       </div>

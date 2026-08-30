@@ -51,6 +51,7 @@ export interface Engagement {
   phase: Phase
   status: 'active' | 'paused' | 'complete'
   sponsorGoal: string
+  closedOn?: string
 }
 
 export type AssessmentKind = 'self' | 'feedback360' | 'clifton' | 'enneagram'
@@ -71,6 +72,16 @@ export interface Assessment {
   assignedOn: string
   dueOn: string
   completedOn?: string
+  /** Which measurement wave this belongs to. 1 is the baseline. */
+  round: number
+}
+
+/** A round of measurement. Wave 1 is the baseline; later waves are re-measures. */
+export interface FeedbackWave {
+  round: number
+  label: string
+  openedOn: string
+  closedOn?: string
 }
 
 export type Relationship = 'self' | 'manager' | 'peer' | 'direct_report' | 'stakeholder'
@@ -194,7 +205,15 @@ export interface Goal {
   /** 1-5 behavioural anchors: where they started and where we want them. */
   baseline: number
   target: number
-  measures: string[]
+  measures: Measure[]
+}
+
+/** A behavioural measure, ticked off when it has actually been observed. */
+export interface Measure {
+  id: string
+  text: string
+  metOn?: string
+  metBy?: string
 }
 
 export type ActionOwner = 'client' | 'manager' | 'coach'
@@ -211,7 +230,18 @@ export interface Action {
   dueOn: string
   status: 'open' | 'done' | 'skipped'
   completedOn?: string
+  /** Shared by every occurrence of a repeating commitment. */
+  seriesId: string
+  /** 1-based position within the series. */
+  occurrence: number
+  /** Set when the person on the receiving end confirms it actually happened. */
+  confirmedBy?: string
+  confirmedOn?: string
+  /** Set when the recipient says it did not happen as recorded. */
+  disputedOn?: string
 }
+
+export const CADENCE_DAYS: Record<Cadence, number> = { once: 0, weekly: 7, biweekly: 14, monthly: 28 }
 
 /** A dated observation of a goal, from whoever is closest to the behaviour. */
 export interface CheckIn {
@@ -246,6 +276,79 @@ export interface ActivityEvent {
   kind: 'assessment' | 'report' | 'plan' | 'session' | 'checkin' | 'action' | 'system'
 }
 
+/* ------------------------------------------------------------- handover */
+
+/** What the manager keeps running once the coach steps out. */
+export interface Handover {
+  id: string
+  engagementId: string
+  closedOn: string
+  /** Goals the manager continues to own after close. */
+  carriedGoalIds: string[]
+  summary: string
+  managerOwns: string
+  reviewOn: string
+  acknowledgedByManagerOn?: string
+  acknowledgedByClientOn?: string
+}
+
+/* ------------------------------------------------------------- settings */
+
+/** Every distinct thing the portal can show. Access is decided per role. */
+export type Resource =
+  | 'engagement.summary'
+  | 'assessment.status'
+  | 'feedback360.raw'
+  | 'feedback360.rollup'
+  | 'feedback360.verbatims'
+  | 'report.evidence'
+  | 'checkins.notes'
+  | 'clifton'
+  | 'enneagram'
+  | 'report'
+  | 'plan.goals'
+  | 'plan.actions'
+  | 'checkins'
+  | 'session.shared'
+  | 'session.private'
+  | 'org.analytics'
+
+export const RESOURCES: Resource[] = [
+  'engagement.summary', 'assessment.status', 'feedback360.raw', 'feedback360.rollup',
+  'feedback360.verbatims', 'report.evidence', 'checkins.notes', 'clifton', 'enneagram',
+  'report', 'plan.goals', 'plan.actions', 'checkins', 'session.shared', 'session.private',
+  'org.analytics',
+]
+
+export const ROLES: Role[] = ['coach', 'client', 'manager', 'hr']
+
+/**
+ * `full` — always visible.
+ * `shared` — visible only once the coach publishes the report to that role.
+ * `none` — never visible.
+ */
+export type VisibilityLevel = 'full' | 'shared' | 'none'
+
+export type VisibilityMatrix = Record<Resource, Record<Role, VisibilityLevel>>
+
+export interface PortalSettings {
+  visibility: VisibilityMatrix
+  /** Responses a rater group needs before its scores are shown. */
+  minGroup: number
+  /** Roles a newly published report is released to by default. */
+  defaultReportAudience: Role[]
+  /** Cadence pre-selected on a new manager commitment. */
+  defaultManagerCadence: Cadence
+  /** How many days out a new commitment is due. */
+  commitmentLeadDays: number
+  /** Weeks between a goal being set and its target date. */
+  goalHorizonWeeks: number
+  /** Ask the client to confirm reinforcement their manager records. */
+  requireReinforcementConfirmation: boolean
+  updatedOn: string
+  updatedBy: string
+}
+
 export interface Database {
   orgs: Org[]
   users: User[]
@@ -262,4 +365,7 @@ export interface Database {
   checkIns: CheckIn[]
   sessions: CoachingSession[]
   activity: ActivityEvent[]
+  waves: FeedbackWave[]
+  handovers: Handover[]
+  settings: PortalSettings
 }

@@ -45,14 +45,46 @@ export interface CommitmentStats {
   done: number
   overdue: number
   rate: number
+  /** Of the completed actions, how many the other party confirmed / disputed. */
+  confirmed: number
+  disputed: number
+  awaitingConfirmation: number
+  /** Follow-through counting only what the recipient confirmed. Never above `rate`. */
+  confirmedRate: number
 }
 
 export function commitmentStats(actions: Action[], owner: Action['owner'], today = todayIso()): CommitmentStats {
   const mine = actions.filter((a) => a.owner === owner)
   const past = mine.filter((a) => a.dueOn <= today)
-  const done = past.filter((a) => a.status === 'done').length
+  const completed = past.filter((a) => a.status === 'done')
+  const done = completed.length
   const overdue = past.filter((a) => a.status === 'open').length
-  return { due: past.length, done, overdue, rate: past.length ? done / past.length : 0 }
+  const confirmed = completed.filter((a) => a.confirmedOn).length
+  const disputed = completed.filter((a) => a.disputedOn).length
+  return {
+    due: past.length,
+    done,
+    overdue,
+    rate: past.length ? done / past.length : 0,
+    confirmed,
+    disputed,
+    awaitingConfirmation: done - confirmed - disputed,
+    confirmedRate: past.length ? confirmed / past.length : 0,
+  }
+}
+
+/** Reinforcement actions the client has been asked to confirm and has not yet. */
+export function awaitingConfirmation(db: Database, engagementId: string) {
+  return db.actions.filter(
+    (a) => a.engagementId === engagementId && a.owner === 'manager' && a.status === 'done'
+      && !a.confirmedOn && !a.disputedOn,
+  ).sort((a, b) => (a.dueOn < b.dueOn ? 1 : -1))
+}
+
+/** Measures ticked off across a plan — evidence that a goal actually landed. */
+export function measureProgress(goals: Goal[]) {
+  const all = goals.flatMap((g) => g.measures)
+  return { met: all.filter((m) => m.metOn).length, total: all.length }
 }
 
 export function openActions(db: Database, engagementId: string, owner: Action['owner']) {
@@ -63,15 +95,31 @@ export function openActions(db: Database, engagementId: string, owner: Action['o
 
 /* ---------------------------------------------------------- engagement */
 
+export interface ScoreComponent {
+  key: 'assessment' | 'synthesis' | 'plan'
+  label: string
+  weight: number
+  /** 0-100 for this input on its own. */
+  value: number
+  /** Points this input contributes to the overall score. */
+  contribution: number
+  detail: string
+}
+
 export interface EngagementScore {
-  /** 0-100, banded by lifecycle phase so the number means one thing everywhere. */
+  /** 0-100. Evidence only: no phase, no self-declaration. */
   overall: number
   assessment: number
+  synthesis: number
   plan: number
   reinforcement: number
+  confirmedReinforcement: number
   hasReinforcementData: boolean
   phaseIndex: number
+  components: ScoreComponent[]
 }
+
+export const SCORE_WEIGHTS = { assessment: 0.3, synthesis: 0.15, plan: 0.55 }
 
 /**
  * Progress is evidence, not declaration.
@@ -103,16 +151,43 @@ export function engagementScore(db: Database, e: Engagement): EngagementScore {
   const managerStats = commitmentStats(db.actions.filter((a) => a.engagementId === e.id), 'manager')
 
   // Inputs collected, then synthesised, then behaviour actually moved.
-  const overall = 0.3 * assessment + 0.15 * synthesis + 0.55 * plan
+  const overall = SCORE_WEIGHTS.assessment * assessment + SCORE_WEIGHTS.synthesis * synthesis + SCORE_WEIGHTS.plan * plan
+  const done = assessments.filter((a) => a.status === 'complete').length
+
+  const components: ScoreComponent[] = [
+    {
+      key: 'assessment', label: 'Assessments in', weight: SCORE_WEIGHTS.assessment,
+      value: Math.round(assessment * 100),
+      contribution: Math.round(SCORE_WEIGHTS.assessment * assessment * 100),
+      detail: `${done} of ${assessments.length} complete`,
+    },
+    {
+      key: 'synthesis', label: 'Report', weight: SCORE_WEIGHTS.synthesis,
+      value: Math.round(synthesis * 100),
+      contribution: Math.round(SCORE_WEIGHTS.synthesis * synthesis * 100),
+      detail: !report ? 'Not started' : report.status === 'published' ? `Published v${report.version}` : 'In draft',
+    },
+    {
+      key: 'plan', label: 'Movement against goals', weight: SCORE_WEIGHTS.plan,
+      value: Math.round(plan * 100),
+      contribution: Math.round(SCORE_WEIGHTS.plan * plan * 100),
+      detail: measured.length
+        ? `${measured.length} of ${goals.length} goal${goals.length === 1 ? '' : 's'} observed`
+        : 'No check-ins yet',
+    },
+  ]
 
   return {
     overall: Math.round(overall * 100),
     assessment: Math.round(assessment * 100),
+    synthesis: Math.round(synthesis * 100),
     plan: Math.round(plan * 100),
     reinforcement: Math.round(managerStats.rate * 100),
+    confirmedReinforcement: Math.round(managerStats.confirmedRate * 100),
     /** False when no manager action has ever come due — 0% would be a lie. */
     hasReinforcementData: managerStats.due > 0,
     phaseIndex: Math.max(0, PHASES.findIndex((p) => p.id === e.phase)),
+    components,
   }
 }
 
@@ -141,8 +216,24 @@ const round1 = (n: number | null) => (n === null ? null : Math.round(n * 10) / 1
  */
 export const MIN_GROUP = 3
 
-export function competencyRollup(db: Database, engagementId: string, minGroup = MIN_GROUP): CompetencyRollup[] {
-  const assessmentIds = db.assessments.filter((a) => a.engagementId === engagementId).map((a) => a.id)
+/** Rounds that have at least one submitted response, newest first. */
+export function waveRounds(db: Database, engagementId: string): number[] {
+  const rounds = db.assessments
+    .filter((a) => a.engagementId === engagementId && a.kind === 'feedback360')
+    .filter((a) => db.responses.some((rp) => rp.assessmentId === a.id))
+    .map((a) => a.round)
+  return [...new Set(rounds)].sort((a, b) => b - a)
+}
+
+export function competencyRollup(
+  db: Database,
+  engagementId: string,
+  opts: { minGroup?: number; round?: number } = {},
+): CompetencyRollup[] {
+  const minGroup = opts.minGroup ?? db.settings?.minGroup ?? MIN_GROUP
+  const assessmentIds = db.assessments
+    .filter((a) => a.engagementId === engagementId && (opts.round === undefined || a.round === opts.round))
+    .map((a) => a.id)
   const responses = db.responses.filter((rp) => assessmentIds.includes(rp.assessmentId))
 
   return db.competencies.map((competency) => {
@@ -177,13 +268,49 @@ export function competencyRollup(db: Database, engagementId: string, minGroup = 
   })
 }
 
-export function suppressedGroups(db: Database, engagementId: string, minGroup = MIN_GROUP): Relationship[] {
-  const assessmentIds = db.assessments.filter((a) => a.engagementId === engagementId).map((a) => a.id)
+export function suppressedGroups(
+  db: Database,
+  engagementId: string,
+  opts: { minGroup?: number; round?: number } = {},
+): Relationship[] {
+  const minGroup = opts.minGroup ?? db.settings?.minGroup ?? MIN_GROUP
+  const assessmentIds = db.assessments
+    .filter((a) => a.engagementId === engagementId && (opts.round === undefined || a.round === opts.round))
+    .map((a) => a.id)
   const responses = db.responses.filter((rp) => assessmentIds.includes(rp.assessmentId))
   return RATER_GROUPS.filter((rel) => {
     if (rel === 'self' || rel === 'manager') return false
     const n = responses.filter((rp) => rp.relationship === rel).length
     return n > 0 && n < minGroup
+  })
+}
+
+/** Competency-level movement between two 360 waves, as the raters scored it. */
+export interface WaveMovement {
+  competency: Competency
+  from: number | null
+  to: number | null
+  delta: number | null
+}
+
+export function waveMovement(
+  db: Database,
+  engagementId: string,
+  fromRound: number,
+  toRound: number,
+  opts: { minGroup?: number } = {},
+): WaveMovement[] {
+  const a = competencyRollup(db, engagementId, { ...opts, round: fromRound })
+  const b = competencyRollup(db, engagementId, { ...opts, round: toRound })
+  return a.map((row, i) => {
+    const from = row.others
+    const to = b[i]?.others ?? null
+    return {
+      competency: row.competency,
+      from,
+      to,
+      delta: from !== null && to !== null ? Math.round((to - from) * 10) / 10 : null,
+    }
   })
 }
 

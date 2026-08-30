@@ -1,7 +1,8 @@
+import { DEFAULT_SETTINGS } from '../lib/permissions'
 import type {
   Action, ActivityEvent, Assessment, AssessmentKind, CheckIn, CliftonTheme, CoachingSession,
   Competency, Database, EnneagramResult, Engagement, FeedbackResponse, Goal, Org, Ratings,
-  Relationship, Respondent, SynthesisReport, User,
+  FeedbackWave, Handover, Relationship, Respondent, SynthesisReport, User,
 } from '../types'
 
 /* ------------------------------------------------------------------ dates */
@@ -129,6 +130,8 @@ interface EngagementSpec {
   goals: GoalSpec[]
   sessions: { weeksAgo: number; topic: string; sharedNotes: string; privateNotes: string; status: CoachingSession['status'] }[]
   nextSessionInDays?: number
+  /** A second 360 wave, run late in the engagement to evidence movement. */
+  remeasure?: { daysAgo: number; lift: number; selfKeep: string; selfMore: string }
 }
 
 const r = (pairs: [string, number][]): Ratings => Object.fromEntries(pairs)
@@ -686,7 +689,13 @@ const SPECS: EngagementSpec[] = [
       { weeksAgo: 12, topic: 'Position-first practice', sharedNotes: 'Four forums, four opening positions. Raj noticed unprompted.', privateNotes: 'Fastest behaviour change I have seen from a 9. Motivation was never the issue.', status: 'held' },
       { weeksAgo: 4, topic: 'Re-measure and handover', sharedNotes: 'Pulse check: influence 2.2 → 4.1, decisiveness 2.8 → 3.9. Both goals achieved. Moving to a monthly sustain rhythm with Raj owning reinforcement.', privateNotes: 'Clean close. Good case study candidate — ask about using it.', status: 'held' },
     ],
-    nextSessionInDays: 21,
+    nextSessionInDays: 7,
+    remeasure: {
+      daysAgo: 12,
+      lift: 0.7,
+      selfKeep: 'Holding the line on the Monday note even in the weeks it felt pointless. It is the thing people quote back to me.',
+      selfMore: 'I still take the decision back when the room goes quiet. Sitting in the silence a beat longer is the next piece of work.',
+    },
   },
 
   /* --------------------------------------------------- Amara Osei — intake */
@@ -753,6 +762,8 @@ function buildRatings(base: Ratings, seed: string, spread: number): Ratings {
 }
 
 function build(): Database {
+  const waves: FeedbackWave[] = [{ round: 1, label: 'Baseline', openedOn: daysAgo(240) }]
+  const handovers: Handover[] = []
   const assessments: Assessment[] = []
   const respondents: Respondent[] = []
   const responses: FeedbackResponse[] = []
@@ -779,7 +790,7 @@ function build(): Database {
       const a = spec.assessments[kind]
       const id = `a-${e.id}-${kind}`
       assessments.push({
-        id, engagementId: e.id, kind, status: a.status,
+        id, engagementId: e.id, kind, status: a.status, round: 1,
         assignedOn: e.startedOn,
         dueOn: a.dueIn >= 0 ? daysAhead(a.dueIn) : daysAgo(-a.dueIn),
         completedOn: a.completedDaysAgo !== undefined ? daysAgo(a.completedDaysAgo) : undefined,
@@ -844,6 +855,66 @@ function build(): Database {
       })
     })
 
+    /* the re-measure: a second 360 wave against the same roster */
+    if (spec.remeasure) {
+      const { daysAgo: ago, lift } = spec.remeasure
+      const a360b = `a-${e.id}-feedback360-r2`
+      assessments.push({
+        id: a360b, engagementId: e.id, kind: 'feedback360', status: 'complete', round: 2,
+        assignedOn: daysAgo(ago + 21), dueOn: daysAgo(ago + 3), completedOn: daysAgo(ago),
+      })
+      const selfB = `r-${e.id}-self-r2`
+      const clientUser = USERS.find((u) => u.id === e.clientId)!
+      respondents.push({
+        id: selfB, assessmentId: a360b, name: clientUser.name, email: clientUser.email,
+        relationship: 'self', status: 'submitted', invitedOn: daysAgo(ago + 21), submittedOn: daysAgo(ago + 2),
+      })
+      const selfB2: Ratings = {}
+      for (const cid of CIDS) {
+        const m = spec.selfRatings[cid]
+        // Clients under-rate themselves first time round and catch up more slowly
+        // than the room does; that gap closing is itself the finding. The control
+        // only offers whole numbers, so the stored value has to be one.
+        if (m !== undefined) selfB2[cid] = Math.max(1, Math.min(5, Math.round(m + lift * 1.25)))
+      }
+      responses.push({
+        id: `resp-${selfB}`, assessmentId: a360b, respondentId: selfB, relationship: 'self',
+        submittedOn: daysAgo(ago + 2), ratings: selfB2,
+        keepDoing: spec.remeasure.selfKeep, doMoreOf: spec.remeasure.selfMore,
+      })
+      spec.raters.filter((r) => r.submitted).forEach((rater, i) => {
+        const rid = `r-${e.id}-${i}-r2`
+        const submittedOn = daysAgo(ago + 1 + Math.round(rand() * 5))
+        respondents.push({
+          id: rid, assessmentId: a360b, name: rater.name, email: rater.email,
+          relationship: rater.relationship, status: 'submitted',
+          invitedOn: daysAgo(ago + 21), submittedOn,
+        })
+        const tilt = rater.relationship === 'direct_report' ? -0.3 : rater.relationship === 'manager' ? 0.15 : 0
+        const base: Ratings = {}
+        for (const cid of CIDS) {
+          const m = spec.raterMeans[cid]
+          if (m === undefined) continue
+          const soft = cid === 'c-delegation' || cid === 'c-feedback' || cid === 'c-develop' ? tilt : tilt * 0.4
+          // The competencies the plan worked on move most; everything else drifts.
+          const worked = spec.goals.some((g) => g.competencyId === cid)
+          base[cid] = Math.min(5, m + soft + (worked ? lift : lift * 0.3))
+        }
+        responses.push({
+          id: `resp-${rid}`, assessmentId: a360b, respondentId: rid, relationship: rater.relationship,
+          submittedOn, ratings: buildRatings(base, rid, 0.4),
+          keepDoing: rater.keep, doMoreOf: rater.more,
+        })
+      })
+      activity.push({
+        id: `act-${e.id}-r2`, engagementId: e.id, at: daysAgo(ago), actorId: e.coachId,
+        kind: 'assessment', summary: 'Re-measure 360 closed. Movement is now rater-verified.',
+      })
+      if (!waves.some((w) => w.round === 2)) {
+        waves.push({ round: 2, label: 'Re-measure', openedOn: daysAgo(ago + 21), closedOn: daysAgo(ago) })
+      }
+    }
+
     /* strengths + enneagram */
     if (spec.clifton) {
       clifton.push({
@@ -894,7 +965,19 @@ function build(): Database {
       goals.push({
         id: g.id, engagementId: e.id, title: g.title, description: g.description, competencyId: g.competencyId,
         createdOn: daysAgo(g.weeks * 7 + 3), targetDate: daysAhead(e.phase === 'sustain' ? 14 : 42),
-        status, baseline: g.baseline, target: g.target, measures: g.measures,
+        status, baseline: g.baseline, target: g.target,
+        // Measures already evidenced are ticked in proportion to how far the goal has moved.
+        measures: g.measures.map((text, mi) => {
+          const reached = (mi + 1) / (g.measures.length + 1)
+          const moved = g.target > g.baseline ? (g.latest - g.baseline) / (g.target - g.baseline) : 0
+          const met = moved >= reached
+          return {
+            id: `m-${g.id}-${mi}`,
+            text,
+            metOn: met ? daysAgo(Math.max(2, Math.round(g.weeks * 7 * (1 - reached)))) : undefined,
+            metBy: met ? e.coachId : undefined,
+          }
+        }),
       })
       activity.push({
         id: `act-${g.id}`, engagementId: e.id, at: daysAgo(g.weeks * 7 + 3), actorId: e.coachId,
@@ -935,14 +1018,23 @@ function build(): Database {
             // three weeks ago is a miss, not a task. Some land a little late so the
             // dashboards have genuine overdue work on them.
             const liftLate = isLive && grand() < 0.3
+            // A manager who ticks a reinforcement action is claiming something the
+            // client experienced. Most claims are confirmed; a few are not, which
+            // is the whole point of asking.
+            const confirmed = !isLive && done && owner === 'manager' && grand() < 0.72
+            const disputed = !isLive && done && owner === 'manager' && !confirmed && grand() < 0.35
             run.push({
               id: `ac-${prefix}-${g.id}-${ai}-${k}`, goalId: g.id, engagementId: e.id, owner,
+              seriesId: `sr-${prefix}-${g.id}-${ai}`, occurrence: k + 1,
               title: spec2.title, detail: spec2.detail, cadence: spec2.cadence,
               dueOn: isLive
                 ? (liftLate ? daysAgo(2) : daysAhead(Math.max(2, weeksPerPeriod * 7 - 3)))
                 : daysAgo(dueOffset),
               status: isLive ? 'open' : done ? 'done' : 'skipped',
               completedOn: !isLive && done ? daysAgo(dueOffset + 1) : undefined,
+              confirmedBy: confirmed ? e.clientId : undefined,
+              confirmedOn: confirmed ? daysAgo(Math.max(1, dueOffset)) : undefined,
+              disputedOn: disputed ? daysAgo(Math.max(1, dueOffset)) : undefined,
             })
           }
           actions.push(...run)
@@ -980,6 +1072,9 @@ function build(): Database {
     competencies: COMPETENCIES,
     engagements: SPECS.map((s) => s.engagement),
     assessments, respondents, responses, clifton, enneagram, reports, goals, actions, checkIns, sessions, activity,
+    waves,
+    handovers,
+    settings: { ...DEFAULT_SETTINGS, updatedOn: daysAgo(240), updatedBy: 'u-chris' },
   }
 }
 

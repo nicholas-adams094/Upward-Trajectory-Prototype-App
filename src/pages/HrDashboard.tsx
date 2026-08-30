@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useViewer } from '../auth/AuthContext'
 import { useDb } from '../data/store'
 import { visibleEngagements } from '../lib/permissions'
-import { engagementScore, orgAnalytics, userById } from '../lib/metrics'
+import { engagementScore, orgAnalytics, userById, waveMovement, waveRounds } from '../lib/metrics'
 import { PHASES } from '../types'
 import {
   Avatar, Badge, Card, CardBody, CardHeader, EmptyState, PageHeader, StatTile,
@@ -22,17 +22,30 @@ export function HrDashboard() {
   const a = orgAnalytics(db, engagements)
   const totalPhase = Object.values(a.phaseCounts).reduce((s, n) => s + n, 0)
 
+  // Movement the raters themselves scored, not movement the coaching team logged.
+  const remeasured = engagements
+    .map((e) => {
+      const rounds = waveRounds(db, e.id)
+      if (rounds.length < 2) return null
+      const rows = waveMovement(db, e.id, rounds[rounds.length - 1], rounds[0], { minGroup: db.settings.minGroup })
+        .filter((m) => m.delta !== null)
+      if (!rows.length) return null
+      const avg = rows.reduce((sum, m) => sum + m.delta!, 0) / rows.length
+      return { engagement: e, rows, avg: Math.round(avg * 10) / 10 }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+
   return (
     <>
       <PageHeader
         eyebrow={org.name}
         title="Coaching portfolio"
-        subtitle="Whether the investment is producing behaviour change — and where it is stalling — without reading anybody's coaching notes."
+        subtitle="Progress, reinforcement and risk across the people you sponsor."
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Leaders in coaching" value={a.engagements} foot={`${a.active} active engagements`} />
-        <StatTile label="Average progress" value={a.avgProgress} unit="%" foot="Inputs collected, synthesised, behaviour moved" />
+        <StatTile label="Average progress" value={a.avgProgress} unit="%" foot="Assessments, report and goal movement" />
         <StatTile
           label="Goals achieved"
           value={`${a.goalsAchieved}/${a.goalsTotal}`}
@@ -44,16 +57,37 @@ export function HrDashboard() {
           value={a.avgReinforcement}
           unit="%"
           tone={a.avgReinforcement < 65 ? 'critical' : 'good'}
-          foot="The single best predictor of whether coaching sticks"
+          foot="Actions completed by their due date"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
+          {remeasured.length > 0 && (
+            <Card>
+              <CardHeader
+                title="Rater-verified movement"
+                subtitle="Engagements with a completed re-measure 360"
+                action={<Badge tone="good">{remeasured.length}</Badge>}
+              />
+              <CardBody>
+                <BarList
+                  rows={remeasured.map((r) => ({
+                    label: userById(db, r.engagement.clientId)?.name ?? 'Client',
+                    value: r.avg,
+                    sub: `${r.rows.length} competenc${r.rows.length === 1 ? 'y' : 'ies'} re-rated`,
+                  }))}
+                  max={Math.max(1, ...remeasured.map((r) => Math.abs(r.avg)))}
+                  note="Change in the average score the same raters gave, baseline to re-measure"
+                />
+              </CardBody>
+            </Card>
+          )}
+
           <Card>
             <CardHeader
               title="Competency movement"
-              subtitle="Where the cohort started against where it is now, averaged across every goal targeting that competency."
+              subtitle="Averaged across every goal targeting that competency"
             />
             <CardBody>
               {a.competencyMovement.length ? (
@@ -61,7 +95,7 @@ export function HrDashboard() {
                   rows={a.competencyMovement.map((m) => ({ label: m.competency.name, a: m.baseline, b: m.latest }))}
                   aLabel="Baseline"
                   bLabel="Latest"
-                  note="1–5 against shared behavioural anchors. The right-hand number is the movement."
+                  note="1–5 · right-hand number is the movement"
                 />
               ) : (
                 <p className="text-[13px] text-ink-2">No goals have been set yet, so there is nothing to move.</p>
@@ -129,7 +163,7 @@ export function HrDashboard() {
         <div className="space-y-5">
           {a.atRisk.length > 0 && (
             <Card>
-              <CardHeader title="Where to intervene" subtitle="Not a performance list — a list of engagements that need something from you." />
+              <CardHeader title="Where to intervene" />
               <CardBody>
                 <ul className="space-y-2.5">
                   {a.atRisk.map(({ engagement, reason }) => {
@@ -147,35 +181,34 @@ export function HrDashboard() {
           )}
 
           <Card>
-            <CardHeader title="Reinforcement by manager" subtitle="Coaching that a manager does not reinforce reliably stalls. This is the number to manage." />
+            <CardHeader title="Reinforcement by manager" />
             <CardBody>
               <BarList
                 rows={a.reinforcementByManager.map((m) => ({ label: m.name, value: m.rate, sub: `${m.clients} in coaching` }))}
                 max={100}
                 suffix="%"
-                note="Reinforcement actions completed by their due date."
+                note="Completed by their due date"
               />
             </CardBody>
           </Card>
 
           {a.cliftonDomains.length > 0 && (
             <Card>
-              <CardHeader title="Strengths shape of the cohort" subtitle="Top-five themes by CliftonStrengths domain, aggregated. No individual profile is shown." />
+              <CardHeader title="Strengths shape of the cohort" subtitle="Aggregated · no individual profile" />
               <CardBody>
                 <BarList
                   rows={a.cliftonDomains.map((d) => ({ label: d.domain, value: d.count }))}
-                  note="Counts of top-five themes falling in each domain across the cohort."
+                  note="Top-five themes per domain"
                 />
               </CardBody>
             </Card>
           )}
 
           <Card>
-            <CardHeader title="What you cannot see" />
-            <CardBody className="space-y-2 text-[12.5px] leading-relaxed text-ink-2">
-              <p>Individual 360 responses, written comments, Enneagram narratives, coaching session notes and the coach&rsquo;s private notes are never available to HR — by design, not by omission.</p>
-              <p>Reports appear here only where the coach has explicitly released that version to HR.</p>
-              <Link to="/access" className="inline-block font-medium text-accent hover:underline">The full matrix →</Link>
+            <CardHeader title="Your access" action={<Link to="/settings" className="text-[12.5px] font-medium text-accent hover:underline">Settings →</Link>} />
+            <CardBody className="space-y-1.5 text-[12.5px] leading-snug text-ink-2">
+              <p><span className="font-medium text-ink">Visible</span> — engagement status, goals, progress, reinforcement, released reports.</p>
+              <p><span className="font-medium text-ink">Withheld</span> — 360 responses and comments, Enneagram, session notes.</p>
             </CardBody>
           </Card>
         </div>

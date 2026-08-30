@@ -121,6 +121,78 @@ try {
   for (const g of db.goals) {
     if (g.baseline < 1 || g.baseline > 5 || g.target < 1 || g.target > 5) bad.push(`goal baseline/target off the 1-5 scale: ${g.id}`)
     if (g.targetDate < g.createdOn) bad.push(`goal target date precedes its creation: ${g.id}`)
+    // Measures are records now, not labels: each needs a stable key to tick.
+    for (const m of g.measures) {
+      if (!m.id || typeof m.text !== 'string') bad.push(`goal measure is not a record: ${g.id}`)
+      if (m.metOn && m.metOn > today) bad.push(`goal measure met in the future: ${g.id} ${m.id}`)
+      if (m.metOn && !m.metBy) bad.push(`goal measure met by nobody: ${g.id} ${m.id}`)
+    }
+    const mids = g.measures.map((m) => m.id)
+    if (new Set(mids).size !== mids.length) bad.push(`goal has duplicate measure ids: ${g.id}`)
+  }
+
+  // Every 360 assessment belongs to a declared wave, and every wave has responses.
+  for (const a of db.assessments) {
+    if (!Number.isInteger(a.round) || a.round < 1) bad.push(`assessment has no wave: ${a.id}`)
+    if (a.kind === 'feedback360' && !db.waves.some((w) => w.round === a.round)) {
+      bad.push(`360 assessment cites an undeclared wave: ${a.id} round ${a.round}`)
+    }
+  }
+  for (const w of db.waves) {
+    if (w.closedOn && w.closedOn < w.openedOn) bad.push(`wave closed before it opened: round ${w.round}`)
+  }
+  // A re-measure must be rated by the roster that rated the baseline, or the
+  // movement it shows is a change of audience rather than of behaviour.
+  for (const e of db.engagements) {
+    const rounds = db.assessments.filter((a) => a.engagementId === e.id && a.kind === 'feedback360')
+    if (rounds.length < 2) continue
+    const roster = (a) => new Set(
+      db.respondents.filter((r) => r.assessmentId === a.id && r.relationship !== 'self').map((r) => r.email),
+    )
+    const [first, ...rest] = rounds.sort((a, b) => a.round - b.round)
+    const base = roster(first)
+    for (const later of rest) {
+      for (const email of roster(later)) {
+        if (!base.has(email)) bad.push(`re-measure ${later.id} added a rater who was not in the baseline: ${email}`)
+      }
+    }
+  }
+
+  // Commitments: series keys are consistent and a claim is never both ways.
+  const seriesOwner = new Map()
+  for (const a of db.actions) {
+    if (!a.seriesId || !Number.isInteger(a.occurrence) || a.occurrence < 1) bad.push(`action has no place in its series: ${a.id}`)
+    if (a.confirmedOn && a.disputedOn) bad.push(`action is both confirmed and disputed: ${a.id}`)
+    if (a.confirmedOn && !a.confirmedBy) bad.push(`action confirmed by nobody: ${a.id}`)
+    if ((a.confirmedOn || a.disputedOn) && a.status !== 'done') bad.push(`action carries a claim but is not done: ${a.id}`)
+    const key = `${a.goalId}|${a.owner}|${a.title}`
+    const seen = seriesOwner.get(a.seriesId)
+    if (seen && seen !== key) bad.push(`one series id spans two commitments: ${a.seriesId}`)
+    seriesOwner.set(a.seriesId, key)
+  }
+  for (const [seriesId] of seriesOwner) {
+    const run = db.actions.filter((a) => a.seriesId === seriesId).map((a) => a.occurrence).sort((x, y) => x - y)
+    if (new Set(run).size !== run.length) bad.push(`series has duplicate occurrences: ${seriesId}`)
+    const open = db.actions.filter((a) => a.seriesId === seriesId && a.status === 'open')
+    if (open.length > 1) bad.push(`series has ${open.length} live occurrences at once: ${seriesId}`)
+  }
+
+  // Settings ship with the seed and every resource is decided for every role.
+  const st = db.settings
+  if (!st) bad.push('seed has no settings')
+  else {
+    if (!(st.minGroup >= 1)) bad.push('settings carry no anonymity floor')
+    for (const [resource, row] of Object.entries(st.visibility)) {
+      for (const role of ['coach', 'client', 'manager', 'hr']) {
+        if (!['full', 'shared', 'none'].includes(row[role])) {
+          bad.push(`visibility for ${resource}/${role} is not a level`)
+        }
+      }
+    }
+    if (st.visibility['session.private'].client !== 'none') bad.push('private notes ship visible to the client')
+    for (const role of ['client', 'manager', 'hr']) {
+      if (st.visibility['feedback360.raw'][role] !== 'none') bad.push(`raw 360 ships visible to ${role}`)
+    }
   }
 
   if (bad.length) {
@@ -128,7 +200,9 @@ try {
     process.exit(1)
   }
   console.log('✓ seed data passes every invariant')
-  console.log('  ' + Object.entries(db).map(([k, v]) => `${k} ${v.length}`).join(' · '))
+  console.log('  ' + Object.entries(db)
+    .filter(([, v]) => Array.isArray(v))
+    .map(([k, v]) => `${k} ${v.length}`).join(' · '))
 } finally {
   rmSync(dir, { recursive: true, force: true })
 }

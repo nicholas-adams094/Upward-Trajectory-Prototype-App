@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useViewer } from '../../auth/AuthContext'
 import { useDb } from '../../data/store'
 import { can, reportFor } from '../../lib/permissions'
@@ -21,7 +20,10 @@ export function EngagementDetail() {
   const { id } = useParams()
   const db = useDb()
   const viewer = useViewer()
-  const [tab, setTab] = useState<TabId>('overview')
+  // The tab lives in the URL so a coach can send someone straight to it.
+  const [params, setParams] = useSearchParams()
+  const tab = (params.get('tab') ?? 'overview') as TabId
+  const setTab = (next: TabId) => setParams(next === 'overview' ? {} : { tab: next }, { replace: true })
 
   const engagement = db.engagements.find((e) => e.id === id)
   if (!engagement) {
@@ -70,7 +72,7 @@ export function EngagementDetail() {
             <h1 className="text-2xl font-semibold tracking-tight text-ink">{client.name}</h1>
             <p className="mt-0.5 text-[13.5px] text-ink-2">{client.title} · {org.name}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <StatusPill status={engagement.status === 'active' ? 'active' : 'paused'} />
+              <StatusPill status={engagement.status} />
               <Badge tone="accent">{PHASES[score.phaseIndex].label} phase</Badge>
               <Badge>Started {formatDate(engagement.startedOn)}</Badge>
             </div>
@@ -79,17 +81,17 @@ export function EngagementDetail() {
         <div className="rounded-xl border border-hairline bg-surface px-4 py-3">
           <p className="text-[11.5px] font-medium uppercase tracking-[0.08em] text-muted">Overall progress</p>
           <p className="mt-1 text-[30px] font-semibold leading-none tracking-tight text-ink">{score.overall}<span className="text-[16px] text-ink-2">%</span></p>
-          <p className="mt-1 text-[11.5px] text-muted">Inputs collected, synthesised, behaviour moved</p>
+
         </div>
       </div>
 
-      <Card className="mb-5">
+      <Card className="mb-5 print-hide-when-printing">
         <CardBody>
           <PhaseTrack phases={PHASES} activeIndex={score.phaseIndex} />
         </CardBody>
       </Card>
 
-      <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 rounded-xl border border-hairline bg-surface px-4 py-3 text-[12.5px]">
+      <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 rounded-xl border border-hairline bg-surface px-4 py-3 text-[12.5px] print-hide-when-printing">
         {[{ u: coach, r: 'Coach' }, { u: manager, r: 'Manager' }, { u: hr, r: 'HR partner' }].map(({ u, r }) => (
           <span key={u.id} className="flex items-center gap-2">
             <Avatar name={u.name} accent={u.accent} size={24} />
@@ -101,11 +103,11 @@ export function EngagementDetail() {
         ))}
         <span className="ml-auto flex items-center text-[12px] text-muted">
           Viewing as {ROLE_LABELS[viewer.role].toLowerCase()}
-          <Link to="/access" className="ml-1.5 text-accent underline-offset-2 hover:underline">what you can see</Link>
+          <Link to="/settings" className="ml-1.5 text-accent underline-offset-2 hover:underline">Settings</Link>
         </span>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 print-hide-when-printing">
         <Tabs tabs={tabs} active={active} onChange={setTab} />
       </div>
 

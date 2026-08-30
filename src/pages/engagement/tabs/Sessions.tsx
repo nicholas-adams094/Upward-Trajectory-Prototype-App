@@ -89,10 +89,10 @@ function LogModal({ engagement, onClose }: { engagement: Engagement; onClose: ()
       <div className="space-y-4">
         <Field label="Date"><input className={inputClass} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Topic"><input className={inputClass} value={topic} onChange={(e) => setTopic(e.target.value)} /></Field>
-        <Field label="Shared notes" hint="The client sees these.">
+        <Field label="Shared notes" hint="Visible to the client.">
           <textarea className={inputClass} rows={3} value={sharedNotes} onChange={(e) => setShared(e.target.value)} />
         </Field>
-        <Field label="Private notes" hint="Coach only. Never shown to the client, the manager or HR.">
+        <Field label="Private notes" hint="Coach only.">
           <textarea className={inputClass} rows={3} value={privateNotes} onChange={(e) => setPrivate(e.target.value)} />
         </Field>
       </div>

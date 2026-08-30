@@ -19,7 +19,7 @@ export function ClientDashboard() {
   const engagement = visibleEngagements(db, viewer)[0]
 
   if (!engagement) {
-    return <EmptyState title="No coaching engagement yet" body="Once your engagement is opened by your coach, everything — assessments, your report and your plan — appears here." />
+    return <EmptyState title="No coaching engagement yet" body="Your assessments, report and plan appear here once your coach opens the engagement." />
   }
 
   const score = engagementScore(db, engagement)
@@ -56,7 +56,7 @@ export function ClientDashboard() {
             <Card>
               <CardHeader
                 title="Waiting on you"
-                subtitle="Your coach cannot write the report until these are in."
+                subtitle="Outstanding"
                 action={<Badge tone="warning">{outstanding.length} outstanding</Badge>}
               />
               <CardBody>
@@ -86,7 +86,7 @@ export function ClientDashboard() {
           <Card>
             <CardHeader
               title="This week's commitments"
-              subtitle="The small things that make the coaching stick between sessions."
+              subtitle="Due now"
               action={stats.due ? (
                 <Badge tone={stats.rate >= 0.8 ? 'good' : stats.rate >= 0.6 ? 'warning' : 'critical'}>
                   {Math.round(stats.rate * 100)}% follow-through
@@ -128,7 +128,7 @@ export function ClientDashboard() {
 
           {goals.length > 0 && (
             <Card>
-              <CardHeader title="My goals" subtitle="Where you started, where you are, and where we agreed you are heading." />
+              <CardHeader title="My goals" />
               <CardBody className="space-y-5">
                 {goals.map((g) => {
                   const p = goalProgress(g, db.checkIns)
@@ -178,11 +178,11 @@ export function ClientDashboard() {
           )}
 
           <Card>
-            <CardHeader title="Who else can see this" />
-            <CardBody className="space-y-2.5 text-[12.5px] leading-relaxed text-ink-2">
-              <p><span className="font-medium text-ink">{coach.name}</span> — your coach. Sees everything, including who said what in your 360.</p>
-              <p><span className="font-medium text-ink">{manager.name}</span> — your manager. Sees your plan, your progress and the report{report?.sharedWith.includes('manager') ? '' : ' once it is released'}. Never your 360 comments or session notes.</p>
-              <Link to="/access" className="inline-block font-medium text-accent hover:underline">See the full matrix →</Link>
+            <CardHeader title="Who else can see this" action={<Link to="/settings" className="text-[12.5px] font-medium text-accent hover:underline">Settings →</Link>} />
+            <CardBody className="space-y-1.5 text-[12.5px] leading-snug text-ink-2">
+              <p><span className="font-medium text-ink">{coach.name}</span> — coach · everything</p>
+              <p><span className="font-medium text-ink">{manager.name}</span> — manager · plan, progress{report?.sharedWith.includes('manager') ? ', report' : ''}</p>
+              <p><span className="font-medium text-ink">Nobody else</span> — 360 comments, Enneagram, session notes</p>
             </CardBody>
           </Card>
         </div>
