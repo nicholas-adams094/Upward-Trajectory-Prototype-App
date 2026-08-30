@@ -79,7 +79,7 @@ export function EngagementDetail() {
         <div className="rounded-xl border border-hairline bg-surface px-4 py-3">
           <p className="text-[11.5px] font-medium uppercase tracking-[0.08em] text-muted">Overall progress</p>
           <p className="mt-1 text-[30px] font-semibold leading-none tracking-tight text-ink">{score.overall}<span className="text-[16px] text-ink-2">%</span></p>
-          <p className="mt-1 text-[11.5px] text-muted">Inputs, plan movement & reinforcement</p>
+          <p className="mt-1 text-[11.5px] text-muted">Inputs collected, synthesised, behaviour moved</p>
         </div>
       </div>
 

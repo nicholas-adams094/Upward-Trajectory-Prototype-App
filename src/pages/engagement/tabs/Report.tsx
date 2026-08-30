@@ -62,7 +62,12 @@ export function Report({ engagement }: { engagement: Engagement }) {
   const released = report.published
   const view = isCoach ? report : released
   if (!view) {
-    return (
+    return viewer.id === engagement.clientId ? (
+      <EmptyState
+        title="Your coach is still writing this"
+        body="The report pulls your 360, your self-evaluation, your CliftonStrengths and your Enneagram into one picture. It appears here as soon as your coach publishes it."
+      />
+    ) : (
       <Restricted
         what="The synthesis report"
         why="This report has not been released in its current form. Nothing reaches you until the coach publishes a version and names its audience."
@@ -132,7 +137,7 @@ export function Report({ engagement }: { engagement: Engagement }) {
         <Card>
           <CardHeader title="The numbers behind the narrative" subtitle="The three largest gaps between self-perception and how the organisation experiences them." />
           <CardBody>
-            <ul className="grid gap-3 sm:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {topGaps.map((g) => (
                 <li key={g.competency.id} className="rounded-lg border border-hairline bg-surface-2 px-3.5 py-3">
                   <p className="text-[13px] font-medium text-ink">{g.competency.name}</p>

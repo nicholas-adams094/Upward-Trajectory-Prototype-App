@@ -32,7 +32,7 @@ export function HrDashboard() {
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Leaders in coaching" value={a.engagements} foot={`${a.active} active engagements`} />
-        <StatTile label="Average progress" value={a.avgProgress} unit="%" foot="Inputs, plan movement and reinforcement" />
+        <StatTile label="Average progress" value={a.avgProgress} unit="%" foot="Inputs collected, synthesised, behaviour moved" />
         <StatTile
           label="Goals achieved"
           value={`${a.goalsAchieved}/${a.goalsTotal}`}
@@ -48,7 +48,7 @@ export function HrDashboard() {
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
           <Card>
             <CardHeader

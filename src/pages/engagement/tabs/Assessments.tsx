@@ -5,7 +5,7 @@ import {
   inviteRespondent, saveClifton, saveEnneagram, submitFeedback, submitSelfEvaluation,
 } from '../../../data/actions'
 import { CLIFTON_THEMES, DOMAIN_BLURB, DOMAIN_ORDER, ENNEAGRAM_TYPES } from '../../../lib/frameworks'
-import { formatDate, relativeDays, todayIso } from '../../../lib/metrics'
+import { MIN_GROUP, formatDate, relativeDays, todayIso } from '../../../lib/metrics'
 import { can, reportFor } from '../../../lib/permissions'
 import { ASSESSMENT_LABELS, RELATIONSHIP_LABELS } from '../../../types'
 import type { AssessmentKind, CliftonTheme, Engagement, Ratings } from '../../../types'
@@ -38,7 +38,7 @@ export function Assessments({ engagement }: { engagement: Engagement }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {assessments.map((a) => {
           const overdue = a.status !== 'complete' && a.dueOn < todayIso()
           return (
@@ -406,7 +406,7 @@ function InviteModal({ assessmentId, onClose }: { assessmentId: string; onClose:
       <div className="space-y-4">
         <Field label="Name"><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label="Email"><input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-        <Field label="Relationship to the client" hint="Groups with fewer than two responses are suppressed in the roll-up so no individual rater can be identified.">
+        <Field label="Relationship to the client" hint={`Groups with fewer than ${MIN_GROUP} responses are suppressed in the roll-up so no individual rater can be identified.`}>
           <select className={inputClass} value={relationship} onChange={(e) => setRelationship(e.target.value as typeof relationship)}>
             <option value="manager">Manager</option>
             <option value="peer">Peer</option>

@@ -86,10 +86,12 @@ export function Plan({ engagement }: { engagement: Engagement }) {
                 <Sparkline values={p.checkIns.map((c) => c.rating)} />
                 <div className="flex flex-wrap gap-2">
                   {competency && <Badge>{competency.name}</Badge>}
-                  <Badge tone={p.momentum >= 0 ? 'good' : 'serious'}>
-                    <span aria-hidden="true">{p.momentum >= 0 ? '↗' : '↘'}</span>
-                    {p.momentum >= 0 ? '+' : ''}{p.momentum.toFixed(1)} over 4 check-ins
-                  </Badge>
+                  {p.checkIns.length > 0 && (
+                    <Badge tone={p.momentum >= 0 ? 'good' : 'serious'}>
+                      <span aria-hidden="true">{p.momentum >= 0 ? '↗' : '↘'}</span>
+                      {p.momentum >= 0 ? '+' : ''}{p.momentum.toFixed(1)} over {Math.min(4, p.checkIns.length)} check-in{Math.min(4, p.checkIns.length) === 1 ? '' : 's'}
+                    </Badge>
+                  )}
                   <Badge>Target {formatDate(goal.targetDate)}</Badge>
                 </div>
               </div>
@@ -106,7 +108,7 @@ export function Plan({ engagement }: { engagement: Engagement }) {
               </div>
 
               {showActions ? (
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <ActionColumn
                     title="Client commitments"
                     subtitle={`${Math.round(commitmentStats(actions, 'client').rate * 100)}% follow-through`}
@@ -175,7 +177,7 @@ function ActionColumn({
               ) : (
                 <input
                   type="checkbox"
-                  className="mt-1 shrink-0"
+                  className="mt-0.5 h-6 w-6 shrink-0 accent-[var(--color-accent)]"
                   checked={a.status === 'done'}
                   disabled={!canTick}
                   onChange={(e) => setActionStatus(a.id, e.target.checked ? 'done' : 'open', viewer)}
@@ -320,7 +322,6 @@ function ActionModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
           <select className={inputClass} value={owner} onChange={(e) => setOwner(e.target.value as Action['owner'])}>
             <option value="client">Client</option>
             <option value="manager">Manager</option>
-            <option value="coach">Coach</option>
           </select>
         </Field>
         <Field label="Commitment"><input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} /></Field>

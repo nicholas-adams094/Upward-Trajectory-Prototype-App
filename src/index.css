@@ -12,7 +12,7 @@
   --color-hairline: #e6e5e0;
   --color-ink: #0b0b0b;
   --color-ink-2: #52514e;
-  --color-muted: #898781;
+  --color-muted: #6f6e69; /* 4.76:1 on the page plane — was 3.59:1 */
 
   --color-brand: #1d1b45;
   --color-brand-2: #2e2a6b;

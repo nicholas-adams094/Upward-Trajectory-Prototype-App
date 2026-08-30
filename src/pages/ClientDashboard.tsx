@@ -50,7 +50,7 @@ export function ClientDashboard() {
         </CardBody>
       </Card>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
           {outstanding.length > 0 && (
             <Card>
@@ -87,9 +87,11 @@ export function ClientDashboard() {
             <CardHeader
               title="This week's commitments"
               subtitle="The small things that make the coaching stick between sessions."
-              action={<Badge tone={stats.rate >= 0.8 ? 'good' : stats.rate >= 0.6 ? 'warning' : 'critical'}>
-                {Math.round(stats.rate * 100)}% follow-through
-              </Badge>}
+              action={stats.due ? (
+                <Badge tone={stats.rate >= 0.8 ? 'good' : stats.rate >= 0.6 ? 'warning' : 'critical'}>
+                  {Math.round(stats.rate * 100)}% follow-through
+                </Badge>
+              ) : <Badge>Nothing due yet</Badge>}
             />
             <CardBody>
               {myOpen.length ? (
@@ -101,7 +103,7 @@ export function ClientDashboard() {
                       <li key={a.id} className="flex items-start gap-3">
                         <input
                           type="checkbox"
-                          className="mt-1 shrink-0"
+                          className="mt-0.5 h-6 w-6 shrink-0 accent-[var(--color-accent)]"
                           checked={false}
                           onChange={() => setActionStatus(a.id, 'done', viewer)}
                           aria-label={a.title}
@@ -160,7 +162,7 @@ export function ClientDashboard() {
           )}
 
           <div className="grid gap-3">
-            <StatTile label="Overall progress" value={score.overall} unit="%" foot="Inputs, plan movement and reinforcement" />
+            <StatTile label="Overall progress" value={score.overall} unit="%" foot="Inputs collected, synthesised, behaviour moved" />
           </div>
 
           {report?.status === 'published' && (

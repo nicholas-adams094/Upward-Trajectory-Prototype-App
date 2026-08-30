@@ -55,7 +55,7 @@ export function ManagerDashboard() {
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
           {engagements.map((e) => {
             const client = userById(db, e.clientId)!
@@ -150,7 +150,7 @@ export function ManagerDashboard() {
                     <li key={a.id} className="flex items-start gap-2.5">
                       <input
                         type="checkbox"
-                        className="mt-1 shrink-0"
+                        className="mt-0.5 h-6 w-6 shrink-0 accent-[var(--color-accent)]"
                         checked={false}
                         onChange={() => setActionStatus(a.id, 'done', viewer)}
                         aria-label={a.title}

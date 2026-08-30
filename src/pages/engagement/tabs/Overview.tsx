@@ -39,9 +39,9 @@ export function Overview({ engagement }: { engagement: Engagement }) {
     .slice(0, 8)
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-5">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatTile label="Assessment inputs" value={score.assessment} unit="%" foot="Self, 360, Clifton & Enneagram" />
           <StatTile
             label="Plan movement"

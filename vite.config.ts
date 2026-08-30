@@ -26,11 +26,14 @@ function spaFallback() {
   }
 }
 
-// `preview` serves the built output, so it needs the same base the build used.
+// `preview` serves the built output, so it needs the same base the build used —
+// unless the caller passed --base, which must win over anything inferred here.
 const isPreview = process.argv.includes('preview')
+const cliBaseIndex = process.argv.indexOf('--base')
+const cliBase = cliBaseIndex >= 0 ? process.argv[cliBaseIndex + 1] : undefined
 
 export default defineConfig(({ command }) => ({
-  base: process.env.BASE_PATH ?? (command === 'build' || isPreview ? REPO_BASE : '/'),
+  base: cliBase ?? process.env.BASE_PATH ?? (command === 'build' || isPreview ? REPO_BASE : '/'),
   plugins: [react(), tailwindcss(), spaFallback()],
   server: { port: 5173 },
 }))

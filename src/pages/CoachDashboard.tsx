@@ -39,7 +39,7 @@ export function CoachDashboard() {
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Active engagements" value={analytics.active} foot={`Across ${new Set(engagements.map((e) => e.orgId)).size} client organisations`} />
-        <StatTile label="Average progress" value={analytics.avgProgress} unit="%" foot="Composite across the book" />
+        <StatTile label="Average progress" value={analytics.avgProgress} unit="%" foot="Averaged across the book" />
         <StatTile
           label="Manager reinforcement"
           value={analytics.avgReinforcement}
@@ -55,7 +55,7 @@ export function CoachDashboard() {
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
           {analytics.atRisk.length > 0 && (
             <Card>

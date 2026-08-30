@@ -2,7 +2,6 @@ import type {
   Action, CheckIn, Competency, Database, Engagement, Goal, Relationship, Role,
 } from '../types'
 import { PHASES } from '../types'
-import type { Phase } from '../types'
 
 export const todayIso = () => {
   // The user's calendar date, not UTC's. Everything rendered is a plain date,
@@ -75,25 +74,17 @@ export interface EngagementScore {
 }
 
 /**
- * Progress through the engagement, banded by lifecycle phase.
+ * Progress is evidence, not declaration.
  *
- * A single composite across every phase is misleading — a client who has only
- * filled in questionnaires should not outrank one with four months of measured
- * behaviour change. So each phase owns a band, and position within the band is
- * that phase's own work. This is also continuous: adding a goal cannot make the
- * number fall, because an unmeasured goal contributes nothing either way.
+ * Milestones are weighted in lifecycle order and each one only counts once the
+ * work behind it exists. Phase is deliberately NOT an input: it is set from a
+ * dropdown, so including it let an empty engagement read 90% simply by being
+ * moved to "sustain". Manager reinforcement is not an input either — a client's
+ * progress should not be dragged down by their manager's admin.
  *
- * Manager reinforcement and lifecycle phase are reported separately. Neither
- * belongs inside a number displayed under an individual's name as "progress".
+ * This is also continuous: a goal nobody has observed yet contributes nothing
+ * either way, so adding one to the plan can never make the number fall.
  */
-const PHASE_BANDS: Record<Phase, [number, number]> = {
-  intake: [0, 0.2],
-  assessment: [0.2, 0.4],
-  synthesis: [0.4, 0.55],
-  coaching: [0.55, 0.9],
-  sustain: [0.9, 1],
-}
-
 export function engagementScore(db: Database, e: Engagement): EngagementScore {
   const assessments = db.assessments.filter((a) => a.engagementId === e.id)
   const assessment = assessments.length
@@ -101,34 +92,18 @@ export function engagementScore(db: Database, e: Engagement): EngagementScore {
     : 0
 
   const goals = goalsFor(db, e.id)
-  // A goal nobody has observed yet is not evidence of zero progress.
   const measured = goals.filter((g) => db.checkIns.some((c) => c.goalId === g.id))
   const plan = measured.length
     ? measured.reduce((s, g) => s + goalProgress(g, db.checkIns).pct, 0) / measured.length
     : 0
 
-  const actions = db.actions.filter((a) => a.engagementId === e.id)
-  const managerStats = commitmentStats(actions, 'manager')
-
   const report = db.reports.find((r) => r.engagementId === e.id)
-  const phaseIndex = Math.max(0, PHASES.findIndex((p) => p.id === e.phase))
+  const synthesis = report ? (report.status === 'published' ? 1 : 0.5) : 0
 
-  // How far through the current phase's own work the engagement is.
-  const within = (() => {
-    switch (e.phase) {
-      case 'intake':
-      case 'assessment':
-        return assessment
-      case 'synthesis':
-        return report ? (report.status === 'published' ? 1 : 0.5) : 0
-      case 'coaching':
-      case 'sustain':
-        return measured.length ? plan : 0
-    }
-  })()
+  const managerStats = commitmentStats(db.actions.filter((a) => a.engagementId === e.id), 'manager')
 
-  const [lo, hi] = PHASE_BANDS[e.phase]
-  const overall = lo + (hi - lo) * Math.max(0, Math.min(1, within))
+  // Inputs collected, then synthesised, then behaviour actually moved.
+  const overall = 0.3 * assessment + 0.15 * synthesis + 0.55 * plan
 
   return {
     overall: Math.round(overall * 100),
@@ -137,7 +112,7 @@ export function engagementScore(db: Database, e: Engagement): EngagementScore {
     reinforcement: Math.round(managerStats.rate * 100),
     /** False when no manager action has ever come due — 0% would be a lie. */
     hasReinforcementData: managerStats.due > 0,
-    phaseIndex,
+    phaseIndex: Math.max(0, PHASES.findIndex((p) => p.id === e.phase)),
   }
 }
 

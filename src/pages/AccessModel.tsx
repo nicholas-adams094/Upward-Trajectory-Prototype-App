@@ -1,6 +1,6 @@
 import { Card, CardBody, CardHeader, PageHeader, ScrollableTable } from '../components/ui/primitives'
 import { RESOURCE_LABELS, VISIBILITY_MATRIX } from '../lib/permissions'
-import { ROLE_LABELS } from '../lib/metrics'
+import { MIN_GROUP, ROLE_LABELS } from '../lib/metrics'
 import type { Role } from '../types'
 import { useViewer } from '../auth/AuthContext'
 
@@ -31,7 +31,7 @@ export function AccessModel() {
         subtitle="The portal is shared by four audiences with genuinely different rights. Every screen in this app checks this matrix before it renders — nothing is hidden by convention alone."
       />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
           <CardHeader title="Visibility matrix" subtitle={`You are signed in as a ${ROLE_LABELS[viewer.role].toLowerCase()}. Your column is highlighted.`} />
           <CardBody>
@@ -73,7 +73,7 @@ export function AccessModel() {
             <CardBody className="space-y-4 text-[13px] leading-relaxed text-ink-2">
               <div>
                 <p className="font-semibold text-ink">1. Raw feedback stays in the coaching room.</p>
-                <p className="mt-1">Individual 360 responses are only ever seen by the coach. The client gets the roll-up and the unattributed comments. Rater groups with fewer than two responses are suppressed so a single peer can never be identified by arithmetic — the manager column is the deliberate exception, because a rating from your manager is attributed by design.</p>
+                <p className="mt-1">Individual 360 responses are only ever seen by the coach. The client gets the roll-up and the unattributed comments. Rater groups with fewer than {MIN_GROUP} responses are suppressed so a single peer can never be identified by arithmetic — the pooled average excludes them too, or it would give them away — the manager column is the deliberate exception, because a rating from your manager is attributed by design.</p>
               </div>
               <div>
                 <p className="font-semibold text-ink">2. Nothing travels upward until the coach releases it.</p>

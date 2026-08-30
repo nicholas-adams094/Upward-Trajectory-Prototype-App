@@ -1,7 +1,7 @@
 import { useViewer } from '../../../auth/AuthContext'
 import { useDb } from '../../../data/store'
 import { can, reportFor } from '../../../lib/permissions'
-import { competencyRollup, formatDate, suppressedGroups } from '../../../lib/metrics'
+import { MIN_GROUP, competencyRollup, formatDate, suppressedGroups } from '../../../lib/metrics'
 import { DOMAIN_BLURB, DOMAIN_ORDER } from '../../../lib/frameworks'
 import { RELATIONSHIP_LABELS } from '../../../types'
 import type { Engagement, Relationship } from '../../../types'
@@ -16,11 +16,16 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
   const report = reportFor(db, engagement.id)
   const ctx = { viewer, engagement, report }
 
-  const rollup = competencyRollup(db, engagement.id)
-  const hasData = rollup.some((r) => r.others !== null)
-  const suppressed = suppressedGroups(db, engagement.id)
-
+  const isCoach = viewer.role === 'coach'
+  // The coach is entitled to the attributed responses themselves, so a floor
+  // built to protect raters from everyone else must not hide data from them.
+  const floor = isCoach ? 1 : MIN_GROUP
   const assessmentIds = db.assessments.filter((a) => a.engagementId === engagement.id).map((a) => a.id)
+  const rollup = competencyRollup(db, engagement.id, floor)
+  const suppressed = suppressedGroups(db, engagement.id, floor)
+  const anyResponses = db.responses.some((r) => assessmentIds.includes(r.assessmentId) && r.relationship !== 'self')
+  const hasData = rollup.some((r) => r.others !== null || Object.keys(r.byGroup).length > 0)
+
   // Comments from a suppressed group are as identifying as the scores were —
   // more so, because they carry content. Withhold them on the same rule.
   const responses = db.responses.filter(
@@ -35,7 +40,14 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
   const enneagram = db.enneagram.find((c) => c.engagementId === engagement.id)
 
   if (!hasData) {
-    return <EmptyState title="No 360 results yet" body="Results appear here once at least one rater has submitted. Groups with fewer than two responses stay suppressed." />
+    return anyResponses ? (
+      <EmptyState
+        title="Not enough responses to show results yet"
+        body={`Responses are in, but no rater group has reached ${MIN_GROUP} yet. Scores stay hidden until a group is large enough that no individual's answers can be worked out from the average.`}
+      />
+    ) : (
+      <EmptyState title="No 360 results yet" body="Results appear here once raters start submitting." />
+    )
   }
 
   const biggest = [...rollup].filter((r) => r.gap !== null).sort((a, b) => Math.abs(b.gap!) - Math.abs(a.gap!))[0]
@@ -68,7 +80,7 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
       <Card>
         <CardHeader
           title="By rater group"
-          subtitle="Where the cost of a behaviour actually lands. The manager column is attributed by design; every other group needs at least two responses before it is shown."
+          subtitle={`Where the cost of a behaviour actually lands. The manager column is attributed by design; every other group needs at least ${floor} responses before it is shown.`}
         />
         <CardBody>
           <ScrollableTable hint="Scroll the table sideways to see every rater group.">
@@ -104,14 +116,14 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
           {suppressed.length > 0 && (
             <p className="mt-3 text-[12.5px] leading-snug text-muted">
               <span aria-hidden="true">🔒 </span>
-              {suppressed.map((s) => RELATIONSHIP_LABELS[s]).join(' and ')} suppressed — fewer than two responses in the group.
+              {suppressed.map((s) => RELATIONSHIP_LABELS[s]).join(', ')} suppressed — fewer than {floor} responses in the group.
             </p>
           )}
         </CardBody>
       </Card>
 
       {can('feedback360.verbatims', ctx) ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Card>
             <CardHeader title="Keep doing" subtitle="Verbatim, unattributed." />
             <CardBody>

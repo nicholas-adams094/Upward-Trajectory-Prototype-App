@@ -43,7 +43,7 @@ export function Progress({ engagement }: { engagement: Engagement }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatTile label="Average movement" value={`${totalMovement >= 0 ? '+' : ''}${totalMovement.toFixed(1)}`} foot="Points on the 1–5 scale since baseline" tone={totalMovement > 0 ? 'good' : undefined} />
         <StatTile label="Goals achieved" value={`${achieved}/${goals.length}`} foot="Hit or passed their target rating" />
         <StatTile label="Check-ins logged" value={db.checkIns.filter((c) => c.engagementId === engagement.id).length} foot="From the coach, the client and the manager" />

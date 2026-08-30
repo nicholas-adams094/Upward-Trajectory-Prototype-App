@@ -47,6 +47,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const mine = visibleEngagements(db, user)
   const own = mine[0]
 
+  const mobileNav: { to: string; label: string; end?: boolean }[] = [
+    ...(user.role === 'coach' ? [{ to: '/coach', label: 'Dashboard', end: true }, { to: '/coach/clients', label: 'Clients' }] : []),
+    ...(user.role === 'client'
+      ? [{ to: '/me', label: 'Dashboard', end: true }, ...(own ? [{ to: `/engagements/${own.id}`, label: 'My development' }] : [])]
+      : []),
+    ...(user.role === 'manager' ? [{ to: '/team', label: 'My team', end: true }] : []),
+    ...(user.role === 'hr' ? [{ to: '/org', label: 'Organisation', end: true }, { to: '/org/people', label: 'People' }] : []),
+    { to: '/access', label: 'Who sees what' },
+  ]
+
   return (
     <div className="flex min-h-full">
       <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-brand md:flex">
@@ -92,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           <button
             onClick={() => { if (confirm('Reset all demo data to its seeded state?')) resetDemoData() }}
-            className="w-full rounded-lg px-3 py-1.5 text-left text-[12.5px] text-white/40 hover:bg-white/8 hover:text-white/80"
+            className="w-full rounded-lg px-3 py-1.5 text-left text-[12.5px] text-white/70 hover:bg-white/8 hover:text-white"
           >
             Reset demo data
           </button>
@@ -100,14 +110,41 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-hairline bg-surface/95 px-4 py-2.5 backdrop-blur md:hidden">
-          <span className="text-[13.5px] font-semibold text-ink">Upward Trajectory</span>
-          <div className="flex items-center gap-2">
-            <NavLink to={user.role === 'coach' ? '/coach' : user.role === 'client' ? '/me' : user.role === 'manager' ? '/team' : '/org'} className="text-[12.5px] text-accent">
-              Home
-            </NavLink>
-            <button onClick={() => { signOut(); navigate('/login') }} className="text-[12.5px] text-ink-2">Switch</button>
+        <header className="no-print sticky top-0 z-30 border-b border-hairline bg-surface/95 backdrop-blur md:hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+            <span className="text-[13.5px] font-semibold text-ink">Upward Trajectory</span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => { if (confirm('Reset all demo data to its seeded state?')) resetDemoData() }}
+                className="rounded-lg px-2.5 py-2 text-[12.5px] text-ink-2"
+              >
+                Reset
+              </button>
+              <button
+                onClick={() => { signOut(); navigate('/login') }}
+                className="rounded-lg px-2.5 py-2 text-[12.5px] font-medium text-accent"
+              >
+                Switch user
+              </button>
+            </div>
           </div>
+          {/* Every sidebar destination stays reachable on a phone. */}
+          <nav className="flex gap-1 overflow-x-auto px-3 pb-2">
+            {mobileNav.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `shrink-0 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition ${
+                    isActive ? 'border-accent bg-accent-soft text-[#3730a3]' : 'border-hairline text-ink-2'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
       </div>

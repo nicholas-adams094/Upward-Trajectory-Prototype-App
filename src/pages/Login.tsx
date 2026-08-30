@@ -55,7 +55,7 @@ export function Login() {
           Prototype — pick a person to sign in as
         </p>
 
-        <div className="mt-4 grid items-start gap-4 md:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 items-start gap-4 md:grid-cols-2">
           {ORDER.map((role) => {
             const users = db.users.filter((u) => u.role === role)
             return (
