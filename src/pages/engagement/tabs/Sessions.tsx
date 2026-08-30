@@ -17,7 +17,7 @@ export function Sessions({ engagement }: { engagement: Engagement }) {
   const sessions = db.sessions
     .filter((s) => s.engagementId === engagement.id)
     .sort((a, b) => (a.date < b.date ? 1 : -1))
-  const upcoming = sessions.filter((s) => s.status === 'scheduled')
+  const upcoming = sessions.filter((s) => s.status === 'scheduled' && s.date >= todayIso())
   const held = sessions.filter((s) => s.status !== 'scheduled')
 
   return (

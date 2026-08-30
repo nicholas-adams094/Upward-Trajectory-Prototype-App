@@ -3,6 +3,7 @@ import { useViewer } from '../../../auth/AuthContext'
 import { useDb } from '../../../data/store'
 import { addCheckIn } from '../../../data/actions'
 import { ROLE_LABELS, formatDate, goalProgress, goalsFor, userById } from '../../../lib/metrics'
+import { can, reportFor } from '../../../lib/permissions'
 import { RATING_ANCHORS } from '../../../lib/frameworks'
 import type { Engagement } from '../../../types'
 import {
@@ -15,6 +16,8 @@ export function Progress({ engagement }: { engagement: Engagement }) {
   const viewer = useViewer()
   const [checkingIn, setCheckingIn] = useState(false)
 
+  const report = reportFor(db, engagement.id)
+  const showNotes = can('checkins.notes', { viewer, engagement, report })
   const goals = goalsFor(db, engagement.id)
   const progress = goals.map((g) => goalProgress(g, db.checkIns))
   const canCheckIn = viewer.role === 'coach' || viewer.id === engagement.clientId || viewer.id === engagement.managerId
@@ -58,7 +61,7 @@ export function Progress({ engagement }: { engagement: Engagement }) {
       </Card>
 
       <Card>
-        <CardHeader title="Recent check-ins" subtitle="Progress is triangulated: the person doing it, the person managing them, and the coach." />
+        <CardHeader title="Recent check-ins" subtitle={showNotes ? 'Logged by the person doing it, the person managing them, and the coach.' : 'Ratings only — what was written on a check-in stays in the coaching relationship.'} />
         <CardBody>
           <ul className="divide-y divide-hairline">
             {recent.map((c) => {
@@ -68,7 +71,7 @@ export function Progress({ engagement }: { engagement: Engagement }) {
                 <li key={c.id} className="flex flex-wrap items-start justify-between gap-3 py-2.5">
                   <div className="min-w-0">
                     <p className="text-[13.5px] font-medium text-ink">{goal?.title ?? 'Goal'}</p>
-                    <p className="text-[12.5px] leading-snug text-ink-2">{c.note}</p>
+                    {showNotes ? <p className="text-[12.5px] leading-snug text-ink-2">{c.note}</p> : null}
                     <p className="mt-0.5 text-[11.5px] text-muted">{by?.name ?? 'Unknown'} · {ROLE_LABELS[c.byRole]} · {formatDate(c.date)}</p>
                   </div>
                   <Badge tone={c.rating >= (goal?.target ?? 4) ? 'good' : c.rating < (goal?.baseline ?? 0) + 0.5 ? 'serious' : 'neutral'}>

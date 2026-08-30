@@ -97,8 +97,8 @@ export function Plan({ engagement }: { engagement: Engagement }) {
               <div>
                 <h3 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">How we will know it worked</h3>
                 <ul className="mt-1.5 space-y-1">
-                  {goal.measures.map((m) => (
-                    <li key={m} className="flex gap-2 text-[13px] leading-relaxed text-ink-2">
+                  {goal.measures.map((m, mi) => (
+                    <li key={mi} className="flex gap-2 text-[13px] leading-relaxed text-ink-2">
                       <span className="mt-0.5 shrink-0 text-muted" aria-hidden="true">□</span>{m}
                     </li>
                   ))}
@@ -225,7 +225,7 @@ function GoalModal({ engagement, onClose }: { engagement: Engagement; onClose: (
           <Button onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"
-            disabled={!title.trim()}
+            disabled={!title.trim() || target <= baseline}
             onClick={() => {
               addGoal({
                 engagementId: engagement.id, title: title.trim(), description, competencyId,
@@ -273,6 +273,9 @@ function GoalModal({ engagement, onClose }: { engagement: Engagement; onClose: (
             <input className={inputClass} type="number" min={1} max={5} step={0.1} value={target} onChange={(e) => setTarget(Number(e.target.value))} />
           </Field>
         </div>
+        {target <= baseline && (
+          <p className="text-[12.5px] text-[#a12d2d]">The target must be above the baseline, or progress can never be shown.</p>
+        )}
         <Field label="How we will know it worked" hint="One measure per line.">
           <textarea className={inputClass} rows={3} value={measures} onChange={(e) => setMeasures(e.target.value)} />
         </Field>

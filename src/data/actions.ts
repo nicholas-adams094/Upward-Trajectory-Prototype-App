@@ -111,6 +111,16 @@ export function publishReport(reportId: string, sharedWith: Role[], actor: User)
     r.publishedOn = todayIso()
     r.updatedOn = todayIso()
     if (!wasDraft) r.version += 1
+    // Freeze what was released. Later edits are the coach's working copy.
+    r.published = {
+      version: r.version,
+      publishedOn: r.publishedOn,
+      headline: r.headline,
+      signatureStrengths: [...r.signatureStrengths],
+      doMoreOf: [...r.doMoreOf],
+      watchOuts: [...r.watchOuts],
+      themes: r.themes.map((t) => ({ ...t, evidence: [...t.evidence] })),
+    }
     const audience = sharedWith.filter((s) => s !== 'client')
     logActivity(
       db, r.engagementId, actor.id, 'report',
@@ -126,6 +136,7 @@ export function unpublishReport(reportId: string, actor: User) {
     r.status = 'draft'
     r.sharedWith = ['client']
     r.publishedOn = undefined
+    r.published = undefined
     logActivity(db, r.engagementId, actor.id, 'report', 'Report withdrawn to draft. Manager and HR access revoked.')
   })
 }
@@ -183,13 +194,16 @@ export function submitFeedback(respondentId: string, ratings: Ratings, keepDoing
 
     const assessment = db.assessments.find((a) => a.id === respondent.assessmentId)
     if (assessment) {
-      const all = db.respondents.filter((r) => r.assessmentId === assessment.id)
-      const submitted = all.filter((r) => r.status === 'submitted').length
-      assessment.status = submitted === all.length ? 'complete' : 'in_progress'
+      // A rater who declined is never going to answer; waiting on them would
+      // leave the window permanently open.
+      const awaited = db.respondents.filter((r) => r.assessmentId === assessment.id && r.status !== 'declined')
+      const submitted = awaited.filter((r) => r.status === 'submitted').length
+      assessment.status = submitted === awaited.length ? 'complete' : 'in_progress'
       assessment.completedOn = assessment.status === 'complete' ? todayIso() : undefined
+      const engagement = db.engagements.find((e) => e.id === assessment.engagementId)
       logActivity(
-        db, assessment.engagementId, respondent.id, 'assessment',
-        `360 response received (${submitted} of ${all.length} raters in).`,
+        db, assessment.engagementId, engagement?.coachId ?? '', 'assessment',
+        `360 response received (${submitted} of ${awaited.length} raters in).`,
       )
     }
   })
@@ -206,8 +220,13 @@ export function inviteRespondent(
     })
     const assessment = db.assessments.find((a) => a.id === assessmentId)
     if (assessment) {
-      if (assessment.status === 'not_started') assessment.status = 'in_progress'
-      logActivity(db, assessment.engagementId, actor.id, 'assessment', `${input.name} invited to give 360 feedback.`)
+      // Reopen a completed window too — there is now someone outstanding again.
+      if (assessment.status !== 'in_progress') {
+        assessment.status = 'in_progress'
+        assessment.completedOn = undefined
+      }
+      // No rater name: the feed is visible to roles that must never learn who rated.
+      logActivity(db, assessment.engagementId, actor.id, 'assessment', 'A rater was invited to give 360 feedback.')
     }
   })
 }
@@ -250,7 +269,8 @@ export function logSession(
 ) {
   mutate((db) => {
     db.sessions.push({ ...input, id: newId('s'), durationMin: 60, status: 'held' })
-    logActivity(db, input.engagementId, actor.id, 'session', `Coaching session: ${input.topic}`)
+    // The topic is session content; the feed reaches roles that cannot see it.
+    logActivity(db, input.engagementId, actor.id, 'session', 'Coaching session held.')
   })
 }
 

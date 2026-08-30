@@ -4,6 +4,35 @@ import { seedDatabase } from './seed'
 
 const KEY = 'upward-trajectory.db.v1'
 const SESSION_KEY = 'upward-trajectory.session.v1'
+const SEEDED_KEY = 'upward-trajectory.seeded.v1'
+
+/**
+ * Dates are generated relative to the day the demo is seeded, so a store kept
+ * indefinitely would drift back into "everything overdue". Past this age we
+ * re-seed rather than show a rotted demo to a returning visitor.
+ */
+const MAX_STORE_AGE_DAYS = 14
+
+function storeIsStale(): boolean {
+  try {
+    const seededOn = localStorage.getItem(SEEDED_KEY)
+    if (!seededOn) return true
+    const age = (Date.now() - new Date(`${seededOn}T00:00:00`).getTime()) / 86_400_000
+    return !Number.isFinite(age) || age > MAX_STORE_AGE_DAYS
+  } catch {
+    return true
+  }
+}
+
+function stampSeeded() {
+  try {
+    const d = new Date()
+    const p = (n: number) => String(n).padStart(2, '0')
+    localStorage.setItem(SEEDED_KEY, `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`)
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Every table the app reads. A stored copy missing one is from an older build. */
 const TABLES: (keyof Database)[] = [
@@ -20,7 +49,7 @@ function isUsable(value: unknown): value is Database {
 function load(): Database {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) {
+    if (raw && !storeIsStale()) {
       const parsed: unknown = JSON.parse(raw)
       // A visitor who used an earlier build has a store from an older shape.
       // Re-seeding beats crashing on a missing table.
@@ -31,6 +60,7 @@ function load(): Database {
   }
   const fresh = seedDatabase()
   persist(fresh)
+  stampSeeded()
   return fresh
 }
 
@@ -70,6 +100,7 @@ export function mutate(fn: (draft: Database) => void) {
 export function resetDemoData() {
   db = seedDatabase()
   persist(db)
+  stampSeeded()
   emit()
 }
 

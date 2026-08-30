@@ -148,6 +148,17 @@ export interface ReportTheme {
   evidence: string[]
 }
 
+/** The exact content that was released, frozen at publish time. */
+export interface PublishedReport {
+  version: number
+  publishedOn: string
+  headline: string
+  signatureStrengths: string[]
+  doMoreOf: string[]
+  watchOuts: string[]
+  themes: ReportTheme[]
+}
+
 export interface SynthesisReport {
   id: string
   engagementId: string
@@ -162,6 +173,11 @@ export interface SynthesisReport {
   themes: ReportTheme[]
   /** Who the coach has released this version to, beyond the client. */
   sharedWith: Role[]
+  /**
+   * What everyone other than the coach reads. The fields above are the coach's
+   * working copy; edits to them do not reach the audience until re-published.
+   */
+  published?: PublishedReport
 }
 
 export type GoalStatus = 'not_started' | 'on_track' | 'at_risk' | 'achieved'

@@ -18,7 +18,7 @@ export function CoachDashboard() {
   const analytics = orgAnalytics(db, engagements)
 
   const upcoming = db.sessions
-    .filter((s) => s.status === 'scheduled' && engagements.some((e) => e.id === s.engagementId))
+    .filter((s) => s.status === 'scheduled' && s.date >= todayIso() && engagements.some((e) => e.id === s.engagementId))
     .sort((a, b) => (a.date < b.date ? -1 : 1))
     .slice(0, 5)
 

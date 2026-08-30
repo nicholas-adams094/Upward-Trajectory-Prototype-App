@@ -58,6 +58,22 @@ export function Report({ engagement }: { engagement: Engagement }) {
     )
   }
 
+  // Everyone but the coach reads what was released, not the working draft.
+  const released = report.published
+  const view = isCoach ? report : released
+  if (!view) {
+    return (
+      <Restricted
+        what="The synthesis report"
+        why="This report has not been released in its current form. Nothing reaches you until the coach publishes a version and names its audience."
+      />
+    )
+  }
+  const hasUnpublishedEdits =
+    isCoach && report.status === 'published' && released !== undefined &&
+    JSON.stringify([report.headline, report.signatureStrengths, report.doMoreOf, report.watchOuts, report.themes]) !==
+      JSON.stringify([released.headline, released.signatureStrengths, released.doMoreOf, released.watchOuts, released.themes])
+
   const rollup = competencyRollup(db, engagement.id)
   const topGaps = rollup.filter((r) => r.gap !== null).sort((a, b) => Math.abs(b.gap!) - Math.abs(a.gap!)).slice(0, 3)
 
@@ -73,6 +89,7 @@ export function Report({ engagement }: { engagement: Engagement }) {
           }
           action={
             <div className="no-print flex items-center gap-2">
+              {hasUnpublishedEdits && <Badge tone="warning"><span aria-hidden="true">✎</span> Unpublished edits</Badge>}
               <StatusPill status={report.status} />
               {isCoach && <Button size="sm" onClick={() => setEditing(true)}>Edit</Button>}
               {isCoach && <Button size="sm" variant="primary" onClick={() => setPublishing(true)}>
@@ -82,25 +99,25 @@ export function Report({ engagement }: { engagement: Engagement }) {
           }
         />
         <CardBody className="space-y-6">
-          {report.headline && (
-            <p className="border-l-2 border-accent pl-4 text-[17px] font-medium leading-snug text-ink">{report.headline}</p>
+          {view.headline && (
+            <p className="border-l-2 border-accent pl-4 text-[17px] font-medium leading-snug text-ink">{view.headline}</p>
           )}
 
-          <Section title="Signature strengths" items={report.signatureStrengths} tone="good" />
-          <Section title="What we need more of" items={report.doMoreOf} tone="accent" />
-          <Section title="Watch-outs" items={report.watchOuts} tone="warning" />
+          <Section title="Signature strengths" items={view.signatureStrengths} tone="good" />
+          <Section title="What we need more of" items={view.doMoreOf} tone="accent" />
+          <Section title="Watch-outs" items={view.watchOuts} tone="warning" />
 
-          {report.themes.length > 0 && (
+          {view.themes.length > 0 && can('report.evidence', ctx) && (
             <div>
               <h3 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">Themes in the evidence</h3>
               <div className="mt-3 space-y-5">
-                {report.themes.map((t) => (
-                  <article key={t.title}>
+                {view.themes.map((t, ti) => (
+                  <article key={ti}>
                     <h4 className="text-[15px] font-semibold text-ink">{t.title}</h4>
                     <p className="mt-1 text-[13.5px] leading-relaxed text-ink-2">{t.narrative}</p>
                     <ul className="mt-2 space-y-1.5">
-                      {t.evidence.map((ev) => (
-                        <li key={ev} className="border-l-2 border-hairline pl-3 text-[12.5px] italic leading-relaxed text-ink-2">{ev}</li>
+                      {t.evidence.map((ev, ei) => (
+                        <li key={ei} className="border-l-2 border-hairline pl-3 text-[12.5px] italic leading-relaxed text-ink-2">{ev}</li>
                       ))}
                     </ul>
                   </article>
@@ -111,7 +128,7 @@ export function Report({ engagement }: { engagement: Engagement }) {
         </CardBody>
       </Card>
 
-      {topGaps.length > 0 && (
+      {topGaps.length > 0 && can('feedback360.rollup', ctx) && (
         <Card>
           <CardHeader title="The numbers behind the narrative" subtitle="The three largest gaps between self-perception and how the organisation experiences them." />
           <CardBody>
@@ -144,8 +161,8 @@ function Section({ title, items, tone }: { title: string; items: string[]; tone:
     <div>
       <h3 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">{title}</h3>
       <ul className="mt-2 space-y-2">
-        {items.map((it) => (
-          <li key={it} className="flex gap-2.5 text-[13.5px] leading-relaxed text-ink-2">
+        {items.map((it, i) => (
+          <li key={i} className="flex gap-2.5 text-[13.5px] leading-relaxed text-ink-2">
             <span className={`mt-0.5 shrink-0 font-semibold ${color}`} aria-hidden="true">{bullet}</span>
             <span>{it}</span>
           </li>

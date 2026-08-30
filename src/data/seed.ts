@@ -120,6 +120,8 @@ interface EngagementSpec {
   assessments: Record<AssessmentKind, { status: Assessment['status']; dueIn: number; completedDaysAgo?: number }>
   raters: RaterSpec[]
   selfRatings: Ratings
+  selfKeep: string
+  selfMore: string
   raterMeans: Ratings
   clifton?: CliftonTheme[]
   enneagram?: Omit<EnneagramResult, 'id' | 'engagementId' | 'recordedOn'>
@@ -173,8 +175,13 @@ const SPECS: EngagementSpec[] = [
       { name: 'Hugh Bannerman', email: 'hugh.bannerman@northwind.health', relationship: 'stakeholder', submitted: true,
         keep: 'The only operations leader who answers the question I actually asked.',
         more: 'He under-sells himself in front of the exec team. Own the recommendation.' },
+      { name: 'Denise Kwan', email: 'denise.kwan@northwind.health', relationship: 'stakeholder', submitted: true,
+        keep: 'Good to work with. Responsive, no surprises.',
+        more: 'Honestly nothing major from where I sit — maybe more visibility on what his team is doing.' },
     ],
-    selfRatings: r([['c-strategic', 3.0], ['c-influence', 2.5], ['c-delegation', 3.5], ['c-feedback', 2.5], ['c-decisiveness', 4.0], ['c-collab', 3.5], ['c-develop', 3.0], ['c-resilience', 3.0]]),
+    selfRatings: r([['c-strategic', 3], ['c-influence', 2], ['c-delegation', 4], ['c-feedback', 2], ['c-decisiveness', 4], ['c-collab', 4], ['c-develop', 3], ['c-resilience', 3]]),
+    selfKeep: 'I deliver. Whatever the quarter throws at us, the numbers land.',
+    selfMore: 'Step back sooner. I know what I should do; under pressure I take it back.',
     raterMeans: r([['c-strategic', 4.1], ['c-influence', 4.3], ['c-delegation', 2.3], ['c-feedback', 2.4], ['c-decisiveness', 4.2], ['c-collab', 3.6], ['c-develop', 2.8], ['c-resilience', 3.9]]),
     clifton: [
       { rank: 1, theme: 'Achiever', domain: 'Executing' },
@@ -194,7 +201,7 @@ const SPECS: EngagementSpec[] = [
       status: 'published',
       headline: 'A high-output operator whose next level depends on subtraction, not addition.',
       signatureStrengths: [
-        'Executive presence — rated 4.2 by his raters against a 2.5 self-rating; the single largest blind spot in the data, and it is a positive one.',
+        'Executive presence — rated 4.2 by his raters against a self-rating of 2. The largest gap in the set, and it runs in his favour.',
         'Decisiveness under ambiguity — 4.1 across the panel, and his direct reports put him at 4.0.',
         'Pattern recognition (Strategic #2) applied to operational bottlenecks nobody else has framed yet.',
       ],
@@ -204,17 +211,17 @@ const SPECS: EngagementSpec[] = [
         'Narrate his thinking out loud in leadership forums so the team can learn the pattern, not just the answer.',
       ],
       watchOuts: [
-        'Under load he goes quiet and absorbs the work (Enneagram 3 → 9 stress path). The team experiences it as being cut out.',
+        'Under load he goes quiet and absorbs the work rather than confronting it. The team experiences it as being cut out.',
         'Achiever + Responsibility makes rescuing feel virtuous. It is the behaviour capping his span.',
       ],
       themes: [
         {
           title: 'The delegation ceiling',
-          narrative: 'Delegation sits at 2.3 and carries the widest gap to self-perception in the whole set — 1.2 points. Direct reports rate it 2.2, below both peers and his manager, which tells us the cost lands on the people closest to him.',
+          narrative: 'Delegation is the one competency Marcus rates himself well above the room — 3.5 against 2.3, the largest over-rating in the set. Direct reports put it lowest of all, which tells us the cost lands on the people closest to him.',
           evidence: [
             'Direct report: "I find out a deliverable moved because it is already done."',
             'Manager: "Marcus is the best individual contributor on my team. That is the problem."',
-            'Self-evaluation rated delegation 3.5 — a full point above how the team experiences it.',
+            'Self-evaluation rated delegation 4 — well above how the team experiences it.',
           ],
         },
         {
@@ -228,7 +235,7 @@ const SPECS: EngagementSpec[] = [
         {
           title: 'Presence is already there',
           narrative: 'The gap between how Marcus sees his influence and how the organisation sees it is the most actionable finding in the report. He is holding back a capability he already has.',
-          evidence: ['Stakeholder: "When Marcus talks, the room settles." Self-rating: 2.5.'],
+          evidence: ['Stakeholder: "When Marcus talks, the room settles." Self-rating: 2.'],
         },
       ],
       sharedWith: ['client', 'manager', 'hr'],
@@ -317,8 +324,22 @@ const SPECS: EngagementSpec[] = [
       { name: 'Greg Salinas', email: 'greg.salinas@northwind.health', relationship: 'stakeholder', submitted: true,
         keep: 'The numbers are always right and always on time.',
         more: 'The analysis is always right. I still dread the meeting.' },
+      { name: 'Ravi Menon', email: 'ravi.menon@northwind.health', relationship: 'peer', submitted: true,
+        keep: 'She does the reading. You never have to check her numbers.',
+        more: 'Bring me in before the decision rather than after it. I keep finding out late.' },
+      { name: 'Aoife Brennan', email: 'aoife.brennan@northwind.health', relationship: 'direct_report', submitted: true,
+        keep: 'Clear expectations, always.',
+        more: 'It would help to hear when something went well, not only when it did not.' },
+      { name: 'Tomas Vidal', email: 'tomas.vidal@northwind.health', relationship: 'stakeholder', submitted: true,
+        keep: 'Reliable. The month-end close has not slipped once.',
+        more: 'Less email, more conversation.' },
+      { name: 'Priya Raman', email: 'priya.raman@northwind.health', relationship: 'stakeholder', submitted: true,
+        keep: 'One of the sharpest analytical minds in the finance function.',
+        more: 'She needs to build allies before she needs them, not during.' },
     ],
-    selfRatings: r([['c-strategic', 4.0], ['c-influence', 3.0], ['c-delegation', 3.5], ['c-feedback', 4.5], ['c-decisiveness', 4.5], ['c-collab', 3.0], ['c-develop', 3.5], ['c-resilience', 4.0]]),
+    selfRatings: r([['c-strategic', 4], ['c-influence', 3], ['c-delegation', 4], ['c-feedback', 5], ['c-decisiveness', 5], ['c-collab', 3], ['c-develop', 4], ['c-resilience', 4]]),
+    selfKeep: 'I am rigorous and I do not let things through that are not right.',
+    selfMore: 'Probably bring people with me earlier. I tend to arrive with the answer already worked out.',
     raterMeans: r([['c-strategic', 4.4], ['c-influence', 3.1], ['c-delegation', 3.4], ['c-feedback', 4.2], ['c-decisiveness', 4.4], ['c-collab', 2.2], ['c-develop', 3.2], ['c-resilience', 3.3]]),
     clifton: [
       { rank: 1, theme: 'Analytical', domain: 'Strategic Thinking' },
@@ -352,7 +373,7 @@ const SPECS: EngagementSpec[] = [
       themes: [
         {
           title: 'Escalation as a first resort',
-          narrative: 'Every rater group flagged the same pattern: a disagreement becomes a message to Dana within a day. Lena reads this as efficiency. Her peers read it as being reported on.',
+          narrative: 'Her peers and her stakeholder describe the same pattern: a disagreement becomes a message to Dana within a day. Lena reads this as efficiency. They read it as being reported on.',
           evidence: [
             'Peer: "I would rather Lena tell me I am wrong than tell Dana I am wrong."',
             'Stakeholder: "The analysis is always right. I still dread the meeting."',
@@ -361,7 +382,7 @@ const SPECS: EngagementSpec[] = [
         {
           title: 'The 1w9 standards trap',
           narrative: 'Deliberative and Discipline in the top five, with an Enneagram 1 core, produces a leader who has already decided what "good" looks like before the conversation starts.',
-          evidence: ['Self-rating on collaboration (3.0) is her joint-lowest self-score — she already knows.'],
+          evidence: ['Self-rating on collaboration (3) is her joint-lowest self-score — she already knows.'],
         },
       ],
       sharedWith: ['client'],
@@ -410,7 +431,9 @@ const SPECS: EngagementSpec[] = [
         keep: '',
         more: '' },
     ],
-    selfRatings: r([['c-strategic', 2.5], ['c-influence', 2.5], ['c-delegation', 2.0], ['c-feedback', 3.0], ['c-decisiveness', 3.0], ['c-collab', 4.0], ['c-develop', 3.5], ['c-resilience', 3.0]]),
+    selfRatings: r([['c-strategic', 2], ['c-influence', 2], ['c-delegation', 2], ['c-feedback', 3], ['c-decisiveness', 3], ['c-collab', 4], ['c-develop', 4], ['c-resilience', 3]]),
+    selfKeep: 'I look after my team. People come to me and I make time for them.',
+    selfMore: 'Be firmer. I say yes too quickly and then I am the one absorbing it.',
     raterMeans: r([['c-strategic', 3.0], ['c-influence', 3.2], ['c-delegation', 2.4], ['c-feedback', 3.1], ['c-decisiveness', 3.3], ['c-collab', 4.3], ['c-develop', 3.6], ['c-resilience', 3.4]]),
     clifton: [
       { rank: 1, theme: 'Empathy', domain: 'Relationship Building' },
@@ -461,8 +484,19 @@ const SPECS: EngagementSpec[] = [
       { name: 'Simone Clarke', email: 'simone.clarke@kestrel.co', relationship: 'stakeholder', submitted: true,
         keep: 'Operationally the strongest leader in the business.',
         more: 'Retention in that region is the one number that will not move.' },
+      { name: 'Owen Fitzgerald', email: 'owen.fitzgerald@kestrel.co', relationship: 'peer', submitted: true,
+        keep: 'If Nadia says it will land, it lands.',
+        more: 'Slow down in the handover. Things move faster than the rest of us can follow.' },
+      { name: 'Beatriz Rocha', email: 'beatriz.rocha@kestrel.co', relationship: 'stakeholder', submitted: true,
+        keep: 'Straight answers, every time. That is rarer than it should be.',
+        more: 'Nothing I can think of.' },
+      { name: 'Hal Mortimer', email: 'hal.mortimer@kestrel.co', relationship: 'stakeholder', submitted: true,
+        keep: 'She fixed the depot problem nobody else would touch.',
+        more: 'Her team seem to be holding a lot. Worth checking they are alright.' },
     ],
-    selfRatings: r([['c-strategic', 3.5], ['c-influence', 4.0], ['c-delegation', 3.0], ['c-feedback', 4.0], ['c-decisiveness', 4.5], ['c-collab', 3.5], ['c-develop', 2.5], ['c-resilience', 4.5]]),
+    selfRatings: r([['c-strategic', 4], ['c-influence', 4], ['c-delegation', 3], ['c-feedback', 4], ['c-decisiveness', 5], ['c-collab', 4], ['c-develop', 2], ['c-resilience', 5]]),
+    selfKeep: 'Nobody is unclear about where they stand with me, or where the region stands.',
+    selfMore: 'Grow the people under me instead of carrying the region myself.',
     raterMeans: r([['c-strategic', 3.7], ['c-influence', 4.1], ['c-delegation', 2.9], ['c-feedback', 3.4], ['c-decisiveness', 4.6], ['c-collab', 3.3], ['c-develop', 2.1], ['c-resilience', 3.6]]),
     clifton: [
       { rank: 1, theme: 'Competition', domain: 'Influencing' },
@@ -482,15 +516,15 @@ const SPECS: EngagementSpec[] = [
       status: 'published',
       headline: 'The strongest operator in the network is also its biggest single point of failure.',
       signatureStrengths: [
-        'Decisiveness at 4.3, with her directs at 4.2. Nobody is unclear about who is in charge.',
+        'Decisiveness at 4.3, with her directs at 4.2 — the most decisive leader in the cohort.',
         'Five Influencing themes in the top five. There is no ambiguity about who is in charge.',
       ],
       doMoreOf: [
         'Develop a successor deliberately. Developing others sits at 2.0 — 1.8 from her own directs — and it is the number holding the region hostage.',
-        'Explain the why once more than feels necessary — the 8→5 stress path is information withdrawal.',
+        'Explain the why once more than feels necessary. Under pressure she withholds information without noticing.',
       ],
       watchOuts: [
-        'Retention is the symptom; developing others is the cause. Three of seven raters used the word "intense".',
+        'Retention is the symptom; developing others is the cause. Peers and directs describe the same unpredictability — one calls it "the loudest thing in the room".',
         'Resilience self-rated 4.5 against a rater mean of 3.6 — she is running hotter than she thinks.',
       ],
       themes: [
@@ -572,8 +606,16 @@ const SPECS: EngagementSpec[] = [
       { name: 'Aisha Bello', email: 'aisha.bello@kestrel.co', relationship: 'direct_report', submitted: true,
         keep: 'Fair, patient, never rattled.',
         more: 'Decide in the meeting. Waiting costs us a week every time.' },
+      { name: 'Priya Shah', email: 'priya.shah@kestrel.co', relationship: 'peer', submitted: true,
+        keep: 'Thoughtful. He listens properly, which sounds small and is not.',
+        more: 'I would like to hear his view in the room rather than reading it in the minutes.' },
+      { name: 'Callum Reid', email: 'callum.reid@kestrel.co', relationship: 'direct_report', submitted: true,
+        keep: 'Genuinely fair. Never had a nasty surprise from him.',
+        more: 'Push harder for us with the exec team. We do not always feel represented.' },
     ],
-    selfRatings: r([['c-strategic', 3.0], ['c-influence', 2.0], ['c-delegation', 3.5], ['c-feedback', 3.0], ['c-decisiveness', 3.0], ['c-collab', 3.5], ['c-develop', 3.5], ['c-resilience', 4.0]]),
+    selfRatings: r([['c-strategic', 3], ['c-influence', 2], ['c-delegation', 4], ['c-feedback', 3], ['c-decisiveness', 3], ['c-collab', 4], ['c-develop', 4], ['c-resilience', 4]]),
+    selfKeep: 'I keep things steady and I bring people on. Fleet has not lost anyone in two years.',
+    selfMore: 'Say what I think in the room, at the time, instead of afterwards.',
     raterMeans: r([['c-strategic', 3.4], ['c-influence', 2.2], ['c-delegation', 3.6], ['c-feedback', 3.0], ['c-decisiveness', 2.8], ['c-collab', 3.8], ['c-develop', 3.9], ['c-resilience', 4.2]]),
     clifton: [
       { rank: 1, theme: 'Consistency', domain: 'Executing' },
@@ -601,7 +643,7 @@ const SPECS: EngagementSpec[] = [
         'Bring the decision to the room rather than to the corridor afterwards.',
       ],
       watchOuts: [
-        'Influence at 2.2 and decisiveness at 2.6 are the two lowest scores; both trace to the same 9w1 conflict-avoidance root.',
+        'Influence at 2.2 and decisiveness at 2.6 are the two lowest scores, and both trace to the same reluctance to sit in disagreement.',
       ],
       themes: [
         {
@@ -662,6 +704,8 @@ const SPECS: EngagementSpec[] = [
     },
     raters: [],
     selfRatings: {},
+    selfKeep: '',
+    selfMore: '',
     raterMeans: {},
     goals: [],
     sessions: [
@@ -761,16 +805,21 @@ function build(): Database {
       responses.push({
         id: `resp-${selfRid}`, assessmentId: selfAId, respondentId: selfRid, relationship: 'self',
         submittedOn, ratings: spec.selfRatings,
-        keepDoing: 'I hold a high bar and I deliver. People know what they are getting.',
-        doMoreOf: 'Step back sooner. I know what I need to do; I do not always do it under pressure.',
+        keepDoing: spec.selfKeep,
+        doMoreOf: spec.selfMore,
       })
     }
 
     /* 360 raters */
     const a360 = `a-${e.id}-feedback360`
+    const closedDaysAgo = spec.assessments.feedback360.completedDaysAgo
     spec.raters.forEach((rater, i) => {
       const rid = `r-${e.id}-${i}`
-      const submittedOn = daysAgo(Math.round(20 + rand() * 10))
+      // Anchor submissions to the assessment window, not to today: a rater
+      // cannot answer before being invited or after the window closed.
+      const submittedOn = closedDaysAgo !== undefined
+        ? daysAgo(closedDaysAgo + 1 + Math.round(rand() * 6))
+        : daysAgo(1 + Math.round(rand() * 5))
       respondents.push({
         id: rid, assessmentId: a360, name: rater.name, email: rater.email,
         relationship: rater.relationship, status: rater.submitted ? 'submitted' : 'invited',
@@ -812,11 +861,23 @@ function build(): Database {
     /* report */
     if (spec.report) {
       const { publishedDaysAgo, ...rest } = spec.report
+      const version = rest.status === 'published' ? 2 : 1
+      const publishedOn = publishedDaysAgo !== undefined ? daysAgo(publishedDaysAgo) : undefined
       reports.push({
-        id: `rep-${e.id}`, engagementId: e.id, version: rest.status === 'published' ? 2 : 1,
-        updatedOn: publishedDaysAgo !== undefined ? daysAgo(publishedDaysAgo) : daysAgo(3),
-        publishedOn: publishedDaysAgo !== undefined ? daysAgo(publishedDaysAgo) : undefined,
+        id: `rep-${e.id}`, engagementId: e.id, version,
+        updatedOn: publishedOn ?? daysAgo(3),
+        publishedOn,
         ...rest,
+        published: publishedOn
+          ? {
+              version, publishedOn,
+              headline: rest.headline,
+              signatureStrengths: rest.signatureStrengths,
+              doMoreOf: rest.doMoreOf,
+              watchOuts: rest.watchOuts,
+              themes: rest.themes,
+            }
+          : undefined,
       })
       if (publishedDaysAgo !== undefined) {
         activity.push({
@@ -852,7 +913,8 @@ function build(): Database {
           id: `ci-${g.id}-${w}`, goalId: g.id, engagementId: e.id, byUserId, byRole,
           date: daysAgo((g.weeks - w) * 7),
           rating: value,
-          note: CHECKIN_NOTES[byRole][w % CHECKIN_NOTES[byRole].length],
+          // Offset by goal as well as week, or three goals share one date and one note.
+          note: CHECKIN_NOTES[byRole][(w + hash(g.id)) % CHECKIN_NOTES[byRole].length],
         })
       }
 
@@ -899,7 +961,7 @@ function build(): Database {
       })
       activity.push({
         id: `act-s-${e.id}-${i}`, engagementId: e.id, at: date, actorId: e.coachId,
-        kind: 'session', summary: `Coaching session: ${s.topic}`,
+        kind: 'session', summary: 'Coaching session held.',
       })
     })
     if (spec.nextSessionInDays !== undefined) {

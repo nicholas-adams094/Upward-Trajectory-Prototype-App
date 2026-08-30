@@ -28,7 +28,7 @@ export function ClientDashboard() {
   const myOpen = openActions(db, engagement.id, 'client').slice(0, 6)
   const stats = commitmentStats(actions, 'client')
   const nextSession = db.sessions
-    .filter((s) => s.engagementId === engagement.id && s.status === 'scheduled')
+    .filter((s) => s.engagementId === engagement.id && s.status === 'scheduled' && s.date >= todayIso())
     .sort((a, b) => (a.date < b.date ? -1 : 1))[0]
   const outstanding = db.assessments.filter((a) => a.engagementId === engagement.id && a.status !== 'complete')
   const report = reportFor(db, engagement.id)

@@ -8,7 +8,7 @@ import { CLIFTON_THEMES, DOMAIN_BLURB, DOMAIN_ORDER, ENNEAGRAM_TYPES } from '../
 import { formatDate, relativeDays, todayIso } from '../../../lib/metrics'
 import { can, reportFor } from '../../../lib/permissions'
 import { ASSESSMENT_LABELS, RELATIONSHIP_LABELS } from '../../../types'
-import type { AssessmentKind, CliftonTheme, Engagement, Ratings, Relationship } from '../../../types'
+import type { AssessmentKind, CliftonTheme, Engagement, Ratings } from '../../../types'
 import {
   Badge, Button, Card, CardBody, CardHeader, Field, Modal, Restricted, StatusPill, inputClass,
 } from '../../../components/ui/primitives'
@@ -122,17 +122,15 @@ export function Assessments({ engagement }: { engagement: Engagement }) {
                 {raters.length === 0 && <p className="py-3 text-[13px] text-ink-2">No raters invited yet.</p>}
               </ul>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-4">
-                {(['manager', 'peer', 'direct_report', 'stakeholder'] as Relationship[]).map((rel) => {
-                  const group = raters.filter((r) => r.relationship === rel)
-                  const done = group.filter((r) => r.status === 'submitted').length
-                  return (
-                    <div key={rel} className="rounded-lg border border-hairline bg-surface-2 px-3 py-2.5">
-                      <p className="text-[12px] text-muted">{RELATIONSHIP_LABELS[rel]}</p>
-                      <p className="tabular mt-0.5 text-[18px] font-semibold text-ink">{done}<span className="text-[13px] text-ink-2">/{group.length}</span></p>
-                    </div>
-                  )
-                })}
+              <div className="rounded-lg border border-hairline bg-surface-2 px-3.5 py-3">
+                <p className="text-[12px] text-muted">Responses received</p>
+                <p className="tabular mt-0.5 text-[18px] font-semibold text-ink">
+                  {submitted}<span className="text-[13px] text-ink-2">/{raters.length}</span>
+                </p>
+                <p className="mt-1 text-[11.5px] leading-snug text-muted">
+                  Counts are shown as a total rather than per group — a per-group breakdown would
+                  narrow down who has answered.
+                </p>
               </div>
             )}
           </CardBody>

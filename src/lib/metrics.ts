@@ -2,8 +2,15 @@ import type {
   Action, CheckIn, Competency, Database, Engagement, Goal, Relationship, Role,
 } from '../types'
 import { PHASES } from '../types'
+import type { Phase } from '../types'
 
-export const todayIso = () => new Date().toISOString().slice(0, 10)
+export const todayIso = () => {
+  // The user's calendar date, not UTC's. Everything rendered is a plain date,
+  // so a UTC stamp reads as tomorrow for anyone west of Greenwich after ~17:00.
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
 
 /* --------------------------------------------------------------- goals */
 
@@ -58,12 +65,33 @@ export function openActions(db: Database, engagementId: string, owner: Action['o
 /* ---------------------------------------------------------- engagement */
 
 export interface EngagementScore {
-  /** 0-100 composite used on every dashboard so the number means one thing. */
+  /** 0-100, banded by lifecycle phase so the number means one thing everywhere. */
   overall: number
   assessment: number
   plan: number
   reinforcement: number
+  hasReinforcementData: boolean
   phaseIndex: number
+}
+
+/**
+ * Progress through the engagement, banded by lifecycle phase.
+ *
+ * A single composite across every phase is misleading — a client who has only
+ * filled in questionnaires should not outrank one with four months of measured
+ * behaviour change. So each phase owns a band, and position within the band is
+ * that phase's own work. This is also continuous: adding a goal cannot make the
+ * number fall, because an unmeasured goal contributes nothing either way.
+ *
+ * Manager reinforcement and lifecycle phase are reported separately. Neither
+ * belongs inside a number displayed under an individual's name as "progress".
+ */
+const PHASE_BANDS: Record<Phase, [number, number]> = {
+  intake: [0, 0.2],
+  assessment: [0.2, 0.4],
+  synthesis: [0.4, 0.55],
+  coaching: [0.55, 0.9],
+  sustain: [0.9, 1],
 }
 
 export function engagementScore(db: Database, e: Engagement): EngagementScore {
@@ -73,27 +101,42 @@ export function engagementScore(db: Database, e: Engagement): EngagementScore {
     : 0
 
   const goals = goalsFor(db, e.id)
-  const plan = goals.length
-    ? goals.reduce((s, g) => s + goalProgress(g, db.checkIns).pct, 0) / goals.length
+  // A goal nobody has observed yet is not evidence of zero progress.
+  const measured = goals.filter((g) => db.checkIns.some((c) => c.goalId === g.id))
+  const plan = measured.length
+    ? measured.reduce((s, g) => s + goalProgress(g, db.checkIns).pct, 0) / measured.length
     : 0
 
   const actions = db.actions.filter((a) => a.engagementId === e.id)
-  const reinforcement = commitmentStats(actions, 'manager').rate
+  const managerStats = commitmentStats(actions, 'manager')
 
-  const phaseIndex = PHASES.findIndex((p) => p.id === e.phase)
-  const phaseWeight = (phaseIndex + 1) / PHASES.length
+  const report = db.reports.find((r) => r.engagementId === e.id)
+  const phaseIndex = Math.max(0, PHASES.findIndex((p) => p.id === e.phase))
 
-  // Before the plan exists, progress is about getting the inputs in; after it
-  // exists, progress is about behaviour change.
-  const overall = goals.length
-    ? 0.2 * assessment + 0.5 * plan + 0.15 * reinforcement + 0.15 * phaseWeight
-    : 0.6 * assessment + 0.4 * phaseWeight
+  // How far through the current phase's own work the engagement is.
+  const within = (() => {
+    switch (e.phase) {
+      case 'intake':
+      case 'assessment':
+        return assessment
+      case 'synthesis':
+        return report ? (report.status === 'published' ? 1 : 0.5) : 0
+      case 'coaching':
+      case 'sustain':
+        return measured.length ? plan : 0
+    }
+  })()
+
+  const [lo, hi] = PHASE_BANDS[e.phase]
+  const overall = lo + (hi - lo) * Math.max(0, Math.min(1, within))
 
   return {
     overall: Math.round(overall * 100),
     assessment: Math.round(assessment * 100),
     plan: Math.round(plan * 100),
-    reinforcement: Math.round(reinforcement * 100),
+    reinforcement: Math.round(managerStats.rate * 100),
+    /** False when no manager action has ever come due — 0% would be a lie. */
+    hasReinforcementData: managerStats.due > 0,
     phaseIndex,
   }
 }
@@ -117,9 +160,11 @@ const round1 = (n: number | null) => (n === null ? null : Math.round(n * 10) / 1
 
 /**
  * Rater groups with fewer than `minGroup` submitted responses are suppressed so
- * a single peer's ratings can never be reverse-engineered.
+ * a single peer's ratings can never be reverse-engineered. Three is the floor
+ * every mainstream 360 instrument uses; at two, either member of a pair can
+ * subtract their own score from the mean and read the other's.
  */
-export const MIN_GROUP = 2
+export const MIN_GROUP = 3
 
 export function competencyRollup(db: Database, engagementId: string, minGroup = MIN_GROUP): CompetencyRollup[] {
   const assessmentIds = db.assessments.filter((a) => a.engagementId === engagementId).map((a) => a.id)
@@ -140,8 +185,15 @@ export function competencyRollup(db: Database, engagementId: string, minGroup = 
       if (vals.length >= (rel === 'manager' ? 1 : minGroup)) byGroup[rel] = round1(mean(vals))!
     }
 
-    const otherVals = responses.filter((rp) => rp.relationship !== 'self').map((rp) => rp.ratings[competency.id]).filter((n): n is number => typeof n === 'number')
-    const others = round1(mean(otherVals))
+    // Pool only the groups that survived the floor. Including a suppressed group
+    // here would let anyone solve for it: they can see n and the shown means.
+    const shownGroups = RATER_GROUPS.filter((rel) => rel !== 'self' && byGroup[rel] !== undefined)
+    const otherVals = responses
+      .filter((rp) => rp.relationship !== 'self' && shownGroups.includes(rp.relationship))
+      .map((rp) => rp.ratings[competency.id])
+      .filter((n): n is number => typeof n === 'number')
+    // One surviving group would make "everyone else" that group, restated.
+    const others = shownGroups.length >= 2 ? round1(mean(otherVals)) : null
 
     return {
       competency, self, byGroup, others,

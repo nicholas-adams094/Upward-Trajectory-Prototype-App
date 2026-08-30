@@ -3,7 +3,7 @@ import { useDb } from '../../../data/store'
 import { setPhase } from '../../../data/actions'
 import { can, reportFor } from '../../../lib/permissions'
 import {
-  commitmentStats, engagementScore, formatDate, goalProgress, goalsFor, relativeDays, userById,
+  commitmentStats, engagementScore, formatDate, goalProgress, goalsFor, relativeDays, todayIso, userById,
 } from '../../../lib/metrics'
 import { PHASES } from '../../../types'
 import type { Engagement, Phase } from '../../../types'
@@ -21,9 +21,22 @@ export function Overview({ engagement }: { engagement: Engagement }) {
   const clientStats = commitmentStats(actions, 'client')
   const managerStats = commitmentStats(actions, 'manager')
   const nextSession = db.sessions
-    .filter((s) => s.engagementId === engagement.id && s.status === 'scheduled')
+    .filter((s) => s.engagementId === engagement.id && s.status === 'scheduled' && s.date >= todayIso())
     .sort((a, b) => (a.date < b.date ? -1 : 1))[0]
-  const activity = db.activity.filter((a) => a.engagementId === engagement.id).slice(0, 8)
+  // Every event kind maps to the resource it describes, so the feed cannot
+  // become a side channel around the rest of the model.
+  const ACTIVITY_RESOURCE = {
+    assessment: 'assessment.status',
+    report: 'report',
+    plan: 'plan.goals',
+    session: 'session.shared',
+    checkin: 'checkins',
+    action: 'plan.actions',
+    system: 'engagement.summary',
+  } as const
+  const activity = db.activity
+    .filter((a) => a.engagementId === engagement.id && can(ACTIVITY_RESOURCE[a.kind], ctx))
+    .slice(0, 8)
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -38,8 +51,8 @@ export function Overview({ engagement }: { engagement: Engagement }) {
           />
           <StatTile
             label="Manager reinforcement"
-            value={score.reinforcement}
-            unit="%"
+            value={score.hasReinforcementData ? score.reinforcement : '—'}
+            unit={score.hasReinforcementData ? '%' : undefined}
             tone={managerStats.due >= 4 && managerStats.rate < 0.6 ? 'critical' : undefined}
             foot={managerStats.due ? `${managerStats.done} of ${managerStats.due} actions completed` : 'No actions due yet'}
           />

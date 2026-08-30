@@ -21,7 +21,15 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
   const suppressed = suppressedGroups(db, engagement.id)
 
   const assessmentIds = db.assessments.filter((a) => a.engagementId === engagement.id).map((a) => a.id)
-  const responses = db.responses.filter((r) => assessmentIds.includes(r.assessmentId) && r.relationship !== 'self')
+  // Comments from a suppressed group are as identifying as the scores were —
+  // more so, because they carry content. Withhold them on the same rule.
+  const responses = db.responses.filter(
+    (r) => assessmentIds.includes(r.assessmentId) && r.relationship !== 'self' && !suppressed.includes(r.relationship),
+  )
+  // Rendering both lists in one order pairs each person's two answers.
+  const rotate = <T,>(xs: T[], by: number) => xs.map((_, i) => xs[(i + by) % xs.length])
+  const keepDoing = rotate(responses, 1)
+  const doMoreOf = rotate(responses, Math.max(1, Math.floor(responses.length / 2)))
 
   const clifton = db.clifton.find((c) => c.engagementId === engagement.id)
   const enneagram = db.enneagram.find((c) => c.engagementId === engagement.id)
@@ -108,7 +116,7 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
             <CardHeader title="Keep doing" subtitle="Verbatim, unattributed." />
             <CardBody>
               <ul className="space-y-3">
-                {responses.map((r) => (
+                {keepDoing.map((r) => (
                   <li key={`k-${r.id}`} className="border-l-2 border-hairline pl-3 text-[13px] leading-relaxed text-ink-2">
                     &ldquo;{r.keepDoing}&rdquo;
                     {viewer.role === 'coach' && (
@@ -125,7 +133,7 @@ export function Feedback({ engagement }: { engagement: Engagement }) {
             <CardHeader title="Do more of" subtitle="Verbatim, unattributed." />
             <CardBody>
               <ul className="space-y-3">
-                {responses.map((r) => (
+                {doMoreOf.map((r) => (
                   <li key={`d-${r.id}`} className="border-l-2 border-hairline pl-3 text-[13px] leading-relaxed text-ink-2">
                     &ldquo;{r.doMoreOf}&rdquo;
                     {viewer.role === 'coach' && (

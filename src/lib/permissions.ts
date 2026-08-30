@@ -11,6 +11,8 @@ export type Resource =
   | 'feedback360.raw'
   | 'feedback360.rollup'
   | 'feedback360.verbatims'
+  | 'report.evidence'
+  | 'checkins.notes'
   | 'clifton'
   | 'enneagram'
   | 'report'
@@ -27,6 +29,8 @@ export const RESOURCE_LABELS: Record<Resource, string> = {
   'feedback360.raw': '360 responses attributed to the rater',
   'feedback360.rollup': '360 scores rolled up by rater group',
   'feedback360.verbatims': '360 written comments (unattributed)',
+  'report.evidence': 'Report evidence quotes',
+  'checkins.notes': 'What was written on a check-in',
   clifton: 'CliftonStrengths top 5',
   enneagram: 'Enneagram type & narrative',
   report: 'Synthesis report',
@@ -50,8 +54,9 @@ const sharedWith = (report: SynthesisReport | undefined, role: Role) =>
 export function can(resource: Resource, ctx: AccessContext): boolean {
   const { viewer, engagement, report } = ctx
 
-  // The coach owns the engagement and sees everything in it.
-  if (viewer.role === 'coach') return true
+  // The coach sees everything inside an engagement that is theirs — and nothing
+  // at all inside one that is not.
+  if (viewer.role === 'coach') return !engagement || engagement.coachId === viewer.id
 
   if (resource === 'org.analytics') return viewer.role === 'hr'
 
@@ -73,6 +78,8 @@ export function can(resource: Resource, ctx: AccessContext): boolean {
         case 'plan.goals':
         case 'plan.actions':
         case 'checkins':
+        // The manager logs check-ins themselves, so they read what was written.
+        case 'checkins.notes':
           return true
         case 'report':
         case 'feedback360.rollup':
@@ -132,6 +139,8 @@ export const VISIBILITY_MATRIX: { resource: Resource; roles: Record<Role, 'full'
   { resource: 'feedback360.raw', roles: { coach: 'full', client: 'none', manager: 'none', hr: 'none' } },
   { resource: 'feedback360.rollup', roles: { coach: 'full', client: 'full', manager: 'shared', hr: 'none' } },
   { resource: 'feedback360.verbatims', roles: { coach: 'full', client: 'full', manager: 'none', hr: 'none' } },
+  { resource: 'report.evidence', roles: { coach: 'full', client: 'full', manager: 'none', hr: 'none' } },
+  { resource: 'checkins.notes', roles: { coach: 'full', client: 'full', manager: 'full', hr: 'none' } },
   { resource: 'clifton', roles: { coach: 'full', client: 'full', manager: 'shared', hr: 'none' } },
   { resource: 'enneagram', roles: { coach: 'full', client: 'full', manager: 'none', hr: 'none' } },
   { resource: 'report', roles: { coach: 'full', client: 'full', manager: 'shared', hr: 'shared' } },

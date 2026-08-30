@@ -82,8 +82,8 @@ export function ManagerDashboard() {
                     <div className="rounded-lg border border-hairline bg-surface-2 px-3.5 py-3">
                       <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">What to reinforce</p>
                       <ul className="mt-1.5 space-y-1.5">
-                        {sharedReport.doMoreOf.map((d) => (
-                          <li key={d} className="flex gap-2 text-[13px] leading-relaxed text-ink-2">
+                        {sharedReport.doMoreOf.map((d, di) => (
+                          <li key={di} className="flex gap-2 text-[13px] leading-relaxed text-ink-2">
                             <span className="mt-0.5 shrink-0 text-accent" aria-hidden="true">↗</span>{d}
                           </li>
                         ))}
